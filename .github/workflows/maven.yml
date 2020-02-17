@@ -13,7 +13,7 @@ jobs:
         curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'
         RESPONSE_CODE=`cat curl.out`
         echo RESPONSE_CODE
-        if [ "$RESPONSE_CODE" != "$OK_RESPONSE_CODE" ]; then
+        if [ "$RESPONSE_CODE" != "200" ]; then
         echo "Request failed with response code '$RESPONSE_CODE', expected '$OK_RESPONSE_CODE'"
           exit 1
         else
