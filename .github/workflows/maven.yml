@@ -11,9 +11,9 @@ jobs:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
       run: |
         curl -s -o /dev/null -w "%{http_code}" -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA' > curl.out
-        RESPONSE_CODE=`cat curl.out`
+        RESPONSE_CODE=curl.out
         echo RESPONSE_CODE
-        if [ curl.out != "200" ]; then
+        if [ curl.out != 200 ]; then
         echo "Request failed with response code '$RESPONSE_CODE', expected '$OK_RESPONSE_CODE'"
           exit 1
         else
