@@ -10,7 +10,7 @@ jobs:
       env:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
       run: |
-        curl -s -o /dev/null -w "%{http_code}" -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA' -d > curl.out
+        curl -s -o /dev/null -w "%{http_code}" -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA' > curl.out
         # RESPONSE_CODE=`cat curl.out`
         # echo RESPONSE_CODE
         if [ curl.out != "200" ]; then
