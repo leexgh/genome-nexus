@@ -15,7 +15,7 @@ jobs:
         RESPONSE_CODE=`cat curl_response.txt`
         SEARCH="http_code:200"
         FILE="curl_response.txt"
-        if grep -Fqx "SEARCH" "$FILE"
+        if grep -Fqx "$SEARCH" "$FILE"
         then
           echo "Request succeeded with expected response code '$OK_RESPONSE_CODE'"
           exit 0
