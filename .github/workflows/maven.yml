@@ -9,7 +9,6 @@ jobs:
     - name: GET oncokb data
       env:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
-        OK_RESPONSE_CODE: 200
       run: |
         curl -X GET --header 'Accept: application/json' 'https://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA?token=$ONCOKB_TOKEN&fields=oncokb' -w ",http_code:%{http_code}"> curl_response.txt
         RESPONSE_CODE=`cat curl_response.txt`
