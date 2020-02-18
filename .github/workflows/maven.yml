@@ -17,7 +17,7 @@ jobs:
         # change to SEARCH_ONCOKB="oncokb" after update database
         SEARCH_ONCOKB="protein_id"
         FILE="curl_response.txt"
-        if [ grep -q "$SEARCH_HTTP_CODE" "$FILE" -a grep -q "$SEARCH_ONCOKB" "$FILE"]
+        if [ `grep -q "$SEARCH_HTTP_CODE" "$FILE"` -a `grep -q "$SEARCH_ONCOKB" "$FILE"`]
         then
           echo "Request succeeded with expected response"
           exit 0
