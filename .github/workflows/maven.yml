@@ -11,16 +11,18 @@ jobs:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
         OK_RESPONSE_CODE: 200
       run: |
-        curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}"> curl_response.txt
+        curl -X GET --header 'Accept: application/json' 'https://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA?token=$ONCOKB_TOKEN&fields=oncokb' -w ",http_code:%{http_code}"> curl_response.txt
         RESPONSE_CODE=`cat curl_response.txt`
-        SEARCH="http_code:200"
+        SEARCH_HTTP_CODE="http_code:200"
+        # change to SEARCH_ONCOKB="oncokb" after update database
+        SEARCH_ONCOKB="protein_id"
         FILE="curl_response.txt"
-        if grep -q "$SEARCH" "$FILE"
+        if [ grep -q "$SEARCH_HTTP_CODE" "$FILE" -a grep -q "$SEARCH_ONCOKB" "$FILE"]
         then
           echo "Request succeeded with expected response"
           exit 0
         else
-          echo "Request failed with "$SEARCH""
+          echo "Request failed"
           exit 1
         fi
 
