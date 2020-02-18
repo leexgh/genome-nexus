@@ -1,6 +1,11 @@
 name: Java CI
 
-on: [push]
+on:
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron:  '1 0 * * *'
 
 jobs:
   test-oncokb-endpoint:
@@ -13,8 +18,7 @@ jobs:
         curl -X GET --header 'Accept: application/json' 'https://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA?token=$ONCOKB_TOKEN&fields=oncokb' -w ",http_code:%{http_code}"> curl_response.txt
         RESPONSE_CODE=`cat curl_response.txt`
         SEARCH_HTTP_CODE="http_code:200"
-        # change to SEARCH_ONCOKB="oncokb" after update database
-        SEARCH_ONCOKB="protein_id"
+        SEARCH_ONCOKB="oncokb"
         FILE="curl_response.txt"
         if [ `grep -q "$SEARCH_HTTP_CODE" "$FILE"` -a `grep -q "$SEARCH_ONCOKB" "$FILE"`]
         then
