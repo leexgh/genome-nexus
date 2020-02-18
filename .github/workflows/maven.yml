@@ -11,10 +11,11 @@ jobs:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
         OK_RESPONSE_CODE: 200
       run: |
-        curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}"> curl.out
-        RESPONSE_CODE=`cat curl.out`
+        curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}"> curl_response.txt
+        RESPONSE_CODE=`cat curl_response.txt`
         echo curl.out
-        if [[ 'grep 'http_code:400' curl.out' ]]; then
+        if grep -Fqx "ENST00000487825" curl_response.txt
+        then
           echo "Request succeeded with expected response code '$OK_RESPONSE_CODE'"
           exit 0
         else
