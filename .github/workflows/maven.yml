@@ -18,7 +18,9 @@ jobs:
         if grep -q "$SEARCH" "$FILE"
         then
           echo "Request succeeded with expected response"
+          exit 0
         else
           echo "Request failed with "$SEARCH""
+          exit 1
         fi
 
