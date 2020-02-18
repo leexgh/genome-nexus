@@ -14,7 +14,7 @@ jobs:
         curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}"> curl_response.txt
         RESPONSE_CODE=`cat curl_response.txt`
         echo curl.out
-        if grep -Fqx "ENST00000487825" curl_response.txt
+        if grep -Fqx "http_code:200" curl_response.txt
         then
           echo "Request succeeded with expected response code '$OK_RESPONSE_CODE'"
           exit 0
