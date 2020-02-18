@@ -10,8 +10,8 @@ jobs:
       env:
         ONCOKB_TOKEN: ${{ secrets.ONCOKB_TOKEN }}
       run: |
-        curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}"> curl.out
-        if grep -q 'http_code:200' "$curl.out" ; then
+        curl -X GET --header 'Accept: application/json' 'http://www.genomenexus.org/annotation/17%3Ag.41242962_41242963insGA'  -w ",http_code:%{http_code}" > curl.out
+        if grep -Fqx "http_code:200" curl.out ; then
           echo "Request succeeded with expected response"
           exit 0
         else
