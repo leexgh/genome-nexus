@@ -1,5 +1,7 @@
 package org.cbioportal.genome_nexus.component.search;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.component.annotation.ProteinChangeResolver;
 import org.cbioportal.genome_nexus.model.*;
@@ -13,6 +15,7 @@ import java.util.stream.Collectors;
 @Component
 public class SignalIndexBuilder
 {
+    private static final Log LOG = LogFactory.getLog(SignalIndexBuilder.class);
     private final NotationConverter notationConverter;
     private final ProteinChangeResolver proteinChangeResolver;
 
@@ -30,9 +33,10 @@ public class SignalIndexBuilder
         List<VariantAnnotation> annotations
     )
     {
+        LOG.info("start build signal index in buildQueryIndex...");
         Map<String, String> genomicLocationToVariant = this.genomicLocationToVariant(mutations);
         Map<String, String> variantToProteinChange = this.variantToProteinChange(annotations);
-
+        LOG.info("before return signal index in buildQueryIndex...");
         return mutations
             .stream()
             .map(m -> this.mapMutationToExactQuery(m, genomicLocationToVariant, variantToProteinChange))

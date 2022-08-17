@@ -43,4 +43,6 @@ import java.util.List;
 public interface VariantAnnotationRepository
     extends MongoRepository<VariantAnnotation, String>, GenericMongoRepository {
     List<VariantAnnotation> findByVariantIn(List<String> variants);
+    VariantAnnotation findByVariant(String variant);
+    // VariantAnnotation findBy_id(String variant);
 }

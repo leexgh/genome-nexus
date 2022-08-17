@@ -32,6 +32,7 @@ public class EnsemblServiceImpl implements EnsemblService
         this.ensemblRepository = ensemblRepository;
         LOG.info("Building transcript to Uniprot id map");
         this.transcriptToUniprotMap = this.buildMap();
+        // this.transcriptToUniprotMap = new HashMap<>();
         LOG.info("Finished building transcript to Uniprot id map");
     }
 
@@ -201,9 +202,16 @@ public class EnsemblServiceImpl implements EnsemblService
 
     private Map<String, String> buildMap()
     {
+        LOG.info("fetch ensembl repository all records...");
         List<EnsemblTranscript> transcripts = this.ensemblRepository.findAll();
+        LOG.info("fetched " + transcripts.size() + "records...");
+        int count = 0;
         for (EnsemblTranscript transcript : transcripts) {
+            count++;
             this.transcriptToUniprotMap.put(transcript.getTranscriptId(), transcript.getUniprotId());
+            if (count % 1000 == 0) {
+                LOG.info("put " + count + " records into map...");
+            }
         }
         return transcriptToUniprotMap;
     }

@@ -11,8 +11,11 @@ import org.cbioportal.genome_nexus.service.SignalQueryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class SignalQueryServiceImpl implements SignalQueryService
@@ -43,6 +46,7 @@ public class SignalQueryServiceImpl implements SignalQueryService
 
         LOG.info("Building Signal index");
         this.signalIndex = this.buildIndex();
+        // this.signalIndex = new ArrayList<SignalQuery>();
         LOG.info("Finished building Signal index");
     }
 
@@ -76,13 +80,27 @@ public class SignalQueryServiceImpl implements SignalQueryService
 
     private List<SignalQuery> buildIndex()
     {
+        LOG.info("fetch signal repository all records...");
         List<SignalMutation> mutations = this.signalMutationRepository.findAll();
-
+        LOG.info("fetched " + mutations.size() + " signal records...");
         // this only works if the variant has already been annotated and
         // there is a corresponding entity in the DB.
-        List<VariantAnnotation> annotations = this.variantAnnotationRepository.findByVariantIn(
-            this.indexBuilder.findUniqueVariants(mutations)
-        );
+        LOG.info("fetch annotatioin repository all records...");
+        LOG.info("variant size: " + this.indexBuilder.findUniqueVariants(mutations).size());
+        // List<VariantAnnotation> annotations = this.variantAnnotationRepository.findByVariantIn(
+        //     this.indexBuilder.findUniqueVariants(mutations).subList(0, 50000)
+        // );
+        List<VariantAnnotation> annotations = this.indexBuilder.findUniqueVariants(mutations).stream().map(variant -> {
+            VariantAnnotation annotation = this.variantAnnotationRepository.findByVariant(variant);
+            // if (optionalAnnotation.isPresent()) {
+            //     return optionalAnnotation.get();
+            // } else {
+            //     return null;
+            // }
+            // this.variantAnnotationRepository.findById(variant).get()
+            return annotation;
+        }).filter(v -> v != null).collect(Collectors.toList());
+        LOG.info("fetched " + annotations.size() + "annotations...");
 
         return this.indexBuilder.buildQueryIndex(mutations, annotations);
     }
