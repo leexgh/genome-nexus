@@ -57,9 +57,12 @@ public class OncokbAnnotationEnricher extends BaseAnnotationEnricher
                 try {
                     oncokb = oncokbService.getOncokb(alteration, token);
                 } catch (OncokbWebServiceException e) {
+                    LOG.warn("OncoKB token is not valid, please double check your token");
                     LOG.warn(e.getLocalizedMessage());
                 } catch (OncokbNotFoundException e) {
-                    // fail silently for this variant annotation
+                    LOG.warn("No OncoKB annotation found");
+
+                    LOG.warn(e.getLocalizedMessage());
                 }
             }
 

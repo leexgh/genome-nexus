@@ -45,6 +45,10 @@ public class OncokbDataFetcher extends BaseExternalResourceFetcher<IndicatorQuer
         this.oncokbToken = oncokbToken;
     }
 
+    public boolean validateOncokbToken(String oncokbToken) {
+        return true;
+    }
+
     @Override
     public List<IndicatorQueryResp> fetchInstances(Map<String, String> queryParams)
         throws HttpClientErrorException, ResourceAccessException, ResourceMappingException

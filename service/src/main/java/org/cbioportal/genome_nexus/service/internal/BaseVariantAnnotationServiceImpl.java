@@ -339,18 +339,37 @@ public abstract class BaseVariantAnnotationServiceImpl implements VariantAnnotat
         if (fields.contains(AnnotationField.ONCOKB))
         {
             String oncokbToken = null;
-            if (token != null && token.containsKey("oncokb")) {
-                oncokbToken = token.get("oncokb");
-            }
+            // try {
+            //     // fetch all annotations at once
+            //     token = this.getVariantAnnotations(variants);
+    
+            //     if (postEnrichmentService != null) {
+            //         postEnrichmentService.enrichAnnotations(variantAnnotations);
+            //     }
+            // } catch (VariantAnnotationWebServiceException e) {
+            //     LOG.warn(e.getLocalizedMessage());
+            // }
 
-            postEnrichmentService.registerEnricher(
-                new OncokbAnnotationEnricher(
-                    "oncokb",
-                    oncokbService,
-                    variantAnnotationSummaryService,
-                    oncokbToken
-                )
+            if (token == null) {
+                LOG.warn("Token not found. Please provide your OncoKB token in format of: {\"oncokb\":\"put-your-token1-here\"}. See more information of OncoKB token: https://www.oncokb.org/apiAccess");
+            }
+            else if (token != null) {
+                if (token.containsKey("oncokb") ==  false) {
+                    LOG.warn("OncoKB token not found. Please provide your token in format of: {\"oncokb\":\"put-your-token1-here\"}. See more information of OncoKB token: https://www.oncokb.org/apiAccess");
+                }
+                else {
+                    oncokbToken = token.get("oncokb");
+                    postEnrichmentService.registerEnricher(
+                        new OncokbAnnotationEnricher(
+                            "oncokb",
+                            oncokbService,
+                            variantAnnotationSummaryService,
+                            oncokbToken
+                        )
             );
+                }
+            }
+            
         }
 
         if (fields.contains(AnnotationField.CLINVAR))

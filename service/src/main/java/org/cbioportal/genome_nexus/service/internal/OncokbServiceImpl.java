@@ -38,6 +38,7 @@ public class OncokbServiceImpl implements OncokbService {
         Optional<IndicatorQueryResp> oncokb = null;
 
         oncokbDataFetcher.setOncokbToken(token);
+        System.out.println("token is:" + token);
         try {
             // get the annotation from the web service
             List<IndicatorQueryResp> list = oncokbDataFetcher.fetchInstances(generateQueryString(alteration));
