@@ -1,5 +1,8 @@
 package org.cbioportal.genome_nexus.persistence.internal;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
 
 import org.cbioportal.genome_nexus.model.AggregateSourceInfo;
@@ -11,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
 @Repository
 public class SourceInfoRepository {
@@ -30,8 +35,19 @@ public class SourceInfoRepository {
     }
 
     @Bean
-    public VEPInfo vepInfo(@Value("${gn_vep.server.version:NA}") String serverVersion, @Value("${gn_vep.cache.version:NA}") String cacheVersion, @Value("${gn_vep.region.url:}") String vepRegionURL) {
-        return new VEPInfo(serverVersion, cacheVersion, vepRegionURL);
+    public VEPInfo vepInfo(@Value("${gn_vep.server.version:NA}") String serverVersion, @Value("${vep.url:}") String vepUrl) throws MalformedURLException {
+        URL url = new URL(vepUrl);
+        RestTemplate restTemplate = new RestTemplate();
+        String vepVersion = "";
+        String comment = null;
+        try {
+            vepVersion = String.valueOf(restTemplate.getForObject(url.getProtocol() + "://" + url.getAuthority() + "/info/software", VepVersionObject.class).get("release"));
+        } catch (RestClientException e) {
+            comment = "Error fetching VEP version";
+            vepVersion = "NA";
+        }
+        
+        return new VEPInfo(serverVersion, vepVersion, comment);
     }
 
     public AggregateSourceInfo getAggregateSourceInfo() {
@@ -40,4 +56,6 @@ public class SourceInfoRepository {
         aggregateSourceInfo.setAnnotationSourcesInfo(sourceVersionInfos);
         return aggregateSourceInfo;
     }
+
+    private static class VepVersionObject extends HashMap<String, Integer> {}
 }
