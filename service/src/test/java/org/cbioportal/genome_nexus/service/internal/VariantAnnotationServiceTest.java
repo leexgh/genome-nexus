@@ -2,7 +2,6 @@ package org.cbioportal.genome_nexus.service.internal;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,7 +22,6 @@ import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.component.annotation.ProteinChangeResolver;
 import org.cbioportal.genome_nexus.service.cached.CachedVariantAnnotationFetcher;
 import org.cbioportal.genome_nexus.service.cached.CachedVariantIdAnnotationFetcher;
-import org.cbioportal.genome_nexus.service.cached.CachedVariantRegionAnnotationFetcher;
 import org.cbioportal.genome_nexus.service.exception.CancerHotspotsWebServiceException;
 import org.cbioportal.genome_nexus.service.exception.MutationAssessorNotFoundException;
 import org.cbioportal.genome_nexus.service.exception.MyVariantInfoNotFoundException;
@@ -61,9 +59,6 @@ public class VariantAnnotationServiceTest
 
     @Mock
     private CachedVariantIdAnnotationFetcher idFetcher;
-
-    @Mock
-    private CachedVariantRegionAnnotationFetcher regionFetcher;
 
     @Mock
     private MutationAssessorService mutationAssessorService;

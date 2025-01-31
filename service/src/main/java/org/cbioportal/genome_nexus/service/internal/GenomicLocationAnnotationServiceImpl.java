@@ -38,7 +38,6 @@ import org.cbioportal.genome_nexus.model.*;
 import org.cbioportal.genome_nexus.service.*;
 
 import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
-import org.cbioportal.genome_nexus.service.cached.CachedVariantRegionAnnotationFetcher;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationNotFoundException;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationWebServiceException;
 import org.springframework.context.annotation.Lazy;
@@ -54,7 +53,6 @@ public class GenomicLocationAnnotationServiceImpl implements GenomicLocationAnno
 {
     private static final Log LOG = LogFactory.getLog(GenomicLocationAnnotationService.class);
 
-    private final Boolean isRegionAnnotationEnabled;
     private final NotationConverter notationConverter;
     private final VariantAnnotationService variantAnnotationService;
     private final GenomicLocationToVariantFormat genomicLocationToVariantFormat;
@@ -62,27 +60,18 @@ public class GenomicLocationAnnotationServiceImpl implements GenomicLocationAnno
     private final GenomicLocationsToVariantFormats genomicLocationsToVariantFormats;
 
     @Autowired
-    public GenomicLocationAnnotationServiceImpl(CachedVariantRegionAnnotationFetcher cachedVariantRegionAnnotationFetcher,
+    public GenomicLocationAnnotationServiceImpl(
                                                 NotationConverter notationConverter,
                                                 // Lazy autowire services used for enrichment,
                                                 // otherwise we are getting circular dependency issues
-                                                @Lazy VariantAnnotationService verifiedHgvsVariantAnnotationService,
-                                                @Lazy VariantAnnotationService regionVariantAnnotationService)
+                                                @Lazy VariantAnnotationService verifiedHgvsVariantAnnotationService)
 
     {
         this.notationConverter = notationConverter;
-        this.isRegionAnnotationEnabled = cachedVariantRegionAnnotationFetcher.hasValidURI();
-        if (this.isRegionAnnotationEnabled) {
-            this.variantAnnotationService = regionVariantAnnotationService;
-            this.genomicLocationToVariantFormat = notationConverter::genomicToEnsemblRestRegion;
-            this.genomicLocationStringToVariantFormat = notationConverter::genomicToEnsemblRestRegion;
-            this.genomicLocationsToVariantFormats = notationConverter::genomicToEnsemblRestRegion;
-        } else {
-            this.variantAnnotationService = verifiedHgvsVariantAnnotationService;
-            this.genomicLocationToVariantFormat = notationConverter::genomicToHgvs;
-            this.genomicLocationStringToVariantFormat = notationConverter::genomicToHgvs;
-            this.genomicLocationsToVariantFormats = notationConverter::genomicToHgvs;
-        }
+        this.variantAnnotationService = verifiedHgvsVariantAnnotationService;
+        this.genomicLocationToVariantFormat = notationConverter::genomicToHgvs;
+        this.genomicLocationStringToVariantFormat = notationConverter::genomicToHgvs;
+        this.genomicLocationsToVariantFormats = notationConverter::genomicToHgvs;
     }
 
     @Override
