@@ -9,9 +9,9 @@ public class VEPInfo {
     public Version cache;
     public String comment;
 
-    public VEPInfo(String vepServerVersion, String vepVersion, String comment) {       
-        this.server = new Version(vepServerVersion, true);
-        this.cache = new Version(vepVersion, true);
+    public VEPInfo(String vepServerVersion, String vepVersion, String comment, boolean isStatic) {       
+        this.server = new Version(vepServerVersion, isStatic);
+        this.cache = new Version(vepVersion, isStatic);
         if (this.comment != null) {
             this.comment = comment;
         }
