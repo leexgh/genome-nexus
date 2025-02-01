@@ -169,16 +169,14 @@ public class CancerHotspotServiceImpl implements CancerHotspotService
         throws CancerHotspotsWebServiceException
     {
         List<VariantAnnotation> variantAnnotations = this.genomicLocationAnnotationService.getAnnotations(genomicLocations);
-
-        Map<String, GenomicLocation> originalInputVariantToGenomicLocation = genomicLocations.stream().distinct()
-            .collect(Collectors.toMap(GenomicLocation::getOriginalInput, Function.identity()));
         List<AggregatedHotspots> hotspots = new ArrayList<>();
-        for (VariantAnnotation variantAnnotation : variantAnnotations)
+        for (int i = 0; i < variantAnnotations.size(); i++)
         {
+            VariantAnnotation variantAnnotation = variantAnnotations.get(i);
             AggregatedHotspots aggregatedHotspots = new AggregatedHotspots();
             aggregatedHotspots.setHotspots(this.getHotspotAnnotations(variantAnnotation));
             aggregatedHotspots.setVariant(variantAnnotation.getVariant());
-            aggregatedHotspots.setGenomicLocation(originalInputVariantToGenomicLocation.get(variantAnnotation.getOriginalVariantQuery()));
+            aggregatedHotspots.setGenomicLocation(genomicLocations.get(i));
             hotspots.add(aggregatedHotspots);
         }
 

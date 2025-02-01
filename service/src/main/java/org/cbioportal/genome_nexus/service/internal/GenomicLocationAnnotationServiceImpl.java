@@ -97,32 +97,12 @@ public class GenomicLocationAnnotationServiceImpl implements GenomicLocationAnno
     @Override
     public List<VariantAnnotation> getAnnotations(List<GenomicLocation> genomicLocations)
     {
-        Map<String, Set<String>> convertedVarsToOrigVarQueryMap = mapConvertedVarsToOrigVarQuery(genomicLocations);
-        List<VariantAnnotation> variantAnnotations = new ArrayList<>();
-        this.variantAnnotationService.getAnnotations(
-                this.genomicLocationsToVariantFormats.convert(genomicLocations)
-        ).stream().forEachOrdered((a) -> {
-            if (convertedVarsToOrigVarQueryMap.get(a.getVariant()).size() == 1) {
-                String origVarQuery = convertedVarsToOrigVarQueryMap.get(a.getVariant()).toArray(new String[0])[0];
-                a.setOriginalVariantQuery(origVarQuery);
-                variantAnnotations.add(a);
-            }
-            else {
-                for (String origVarQuery : convertedVarsToOrigVarQueryMap.get(a.getVariant())) {
-                    // if query multiple "identical" variants
-                    // for example "12,25398284,25398284,C,A" and "12,25398283,25398284,AC,AA"
-                    // both variants should be returned
-                    Gson gson = new Gson();
-                    VariantAnnotation tempAnnotation = gson.fromJson(gson.toJson(a), VariantAnnotation.class);
-                    tempAnnotation.setOriginalVariantQuery(origVarQuery);
-                    variantAnnotations.add(tempAnnotation);
-                }
-            }
-        });
-        variantAnnotations.stream().map((VariantAnnotation variantAnnotation) -> {
-            variantAnnotation.setGenomicLocationExplanation(this.notationConverter.getGenomicLocationExplanation(variantAnnotation.getOriginalVariantQuery()));
-            return variantAnnotation;
-        }).collect(Collectors.toList());
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(
+            this.genomicLocationsToVariantFormats.convert(genomicLocations)
+        );
+        for (int i = 0; i < genomicLocations.size(); i++) {
+            variantAnnotations.get(i).setOriginalVariantQuery(genomicLocations.get(i).toString());
+        }
         return variantAnnotations;
     }
 
@@ -149,48 +129,16 @@ public class GenomicLocationAnnotationServiceImpl implements GenomicLocationAnno
                                                   Map<String, String> token,
                                                   List<AnnotationField> fields)
     {
-        Map<String, Set<String>> convertedVarsToOrigVarQueryMap = mapConvertedVarsToOrigVarQuery(genomicLocations);
-        List<VariantAnnotation> variantAnnotations = new ArrayList<>();
-        this.variantAnnotationService.getAnnotations(
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(
                 this.genomicLocationsToVariantFormats.convert(genomicLocations),
                 isoformOverrideSource,
                 token,
                 fields
-        ).stream().forEachOrdered((a) -> {
-            if (convertedVarsToOrigVarQueryMap.get(a.getVariant()).size() == 1) {
-                String origVarQuery = convertedVarsToOrigVarQueryMap.get(a.getVariant()).toArray(new String[0])[0];
-                a.setOriginalVariantQuery(origVarQuery);
-                variantAnnotations.add(a);
-            }
-            else {
-                for (String origVarQuery : convertedVarsToOrigVarQueryMap.get(a.getVariant())) {
-                    // if query multiple "identical" variants
-                    // for example "12,25398284,25398284,C,A" and "12,25398283,25398284,AC,AA"
-                    // both variants should be returned
-                    Gson gson = new Gson();
-                    VariantAnnotation tempAnnotation = gson.fromJson(gson.toJson(a), VariantAnnotation.class);
-                    tempAnnotation.setOriginalVariantQuery(origVarQuery);
-                    variantAnnotations.add(tempAnnotation);
-                }
-            }
-        });
-        variantAnnotations.stream().map((VariantAnnotation variantAnnotation) -> {
-            variantAnnotation.setGenomicLocationExplanation(this.notationConverter.getGenomicLocationExplanation(variantAnnotation.getOriginalVariantQuery()));
-            return variantAnnotation;
-        }).collect(Collectors.toList());
+        );
+        for (int i = 0; i < genomicLocations.size(); i++) {
+            variantAnnotations.get(i).setOriginalVariantQuery(genomicLocations.get(i).toString());
+        }
         return variantAnnotations;
-    }
-
-    private Map<String, Set<String>> mapConvertedVarsToOrigVarQuery(List<GenomicLocation> genomicLocations) {
-        Map<String, Set<String>> convertedVarsToOrigVarQueryMap = new HashMap<>();
-        genomicLocations.forEach((gl) -> {
-            gl.setOriginalInput(gl.toString());
-            // If there are multiple identical genomic locations in the "genomicLocations" list
-            // For example: 12,25398284,25398284,C,A and 12,25398283,25398284,AC,AA
-            // We should keep all records in the "convertedVarsToOrigVarQueryMap"
-            convertedVarsToOrigVarQueryMap.computeIfAbsent(this.genomicLocationToVariantFormat.convert(gl), k -> new HashSet<>()).add(gl.getOriginalInput());
-        });
-        return convertedVarsToOrigVarQueryMap;
     }
 
     @FunctionalInterface
