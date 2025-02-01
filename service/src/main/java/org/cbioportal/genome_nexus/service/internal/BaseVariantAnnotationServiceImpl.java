@@ -53,6 +53,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -207,28 +208,46 @@ public abstract class BaseVariantAnnotationServiceImpl implements VariantAnnotat
     private List<VariantAnnotation> getVariantAnnotationsExternally(List<String> variants)
             throws VariantAnnotationWebServiceException {
         List<VariantAnnotation> variantAnnotations = null;
-        Map<String, String> normVarToOrigVarQueryMap = new LinkedHashMap<>();
+        List<List<String>> normVarToOrigVarQueries = new ArrayList<>();
+        // Map<String, String> normVarToOrigVarQueryMap = new LinkedHashMap<>();
         variants.forEach((variant) -> {
-            normVarToOrigVarQueryMap.put(this.normalizeVariant(variant), variant);
+            List<String> normVarToOrigVarQuery = new ArrayList<>();
+            normVarToOrigVarQuery.add(this.normalizeVariant(variant));
+            normVarToOrigVarQuery.add(variant);
+            normVarToOrigVarQueries.add(normVarToOrigVarQuery);
         });
 
         try {
             // get the annotations from the web service and save it to the DB
-            variantAnnotations = this.resourceFetcher.fetchAndCache(new ArrayList(normVarToOrigVarQueryMap.keySet()));
+            variantAnnotations = this.resourceFetcher.fetchAndCache(
+                normVarToOrigVarQueries.stream().map((normVar) -> normVar.get(0)).collect(Collectors.toList()));
             for (VariantAnnotation variantAnnotation : variantAnnotations) {
-                // if caching is enabled, add to the index DB 
+               // if caching is enabled, add to the index DB 
                 if (cacheEnabled) {
-                    this.saveToIndexDb(normVarToOrigVarQueryMap.get(variantAnnotation.getVariant()), variantAnnotation);
+                    // add new annotation to index 
+                    Optional<List<String>> normVarToOrigVarQuery = normVarToOrigVarQueries
+                        .stream()
+                        .filter((normVar) -> normVar.get(0).equals(variantAnnotation.getVariant()))
+                        .findFirst();
+                    if (normVarToOrigVarQuery.isPresent()) {
+                        this.saveToIndexDb(normVarToOrigVarQuery.get().get(0), variantAnnotation);
+                        variantAnnotation.setOriginalVariantQuery(normVarToOrigVarQuery.get().get(0));
+                    }
                 }
-                variantAnnotation.setOriginalVariantQuery(normVarToOrigVarQueryMap.get(variantAnnotation.getVariant()));
             }
         } catch (HttpClientErrorException e) {
             // in case of web service error, throw an exception to indicate that there is a
             // problem with the service.
-            throw new VariantAnnotationWebServiceException(normVarToOrigVarQueryMap.keySet().toString(), e.getResponseBodyAsString(),
-                    e.getStatusCode());
+            throw new VariantAnnotationWebServiceException(
+                normVarToOrigVarQueries.stream().map((normVar) -> normVar.get(0)).collect(Collectors.toList()).toString(),
+                e.getResponseBodyAsString(),
+                e.getStatusCode()
+            );
         } catch (ResourceAccessException e) {
-            throw new VariantAnnotationWebServiceException(normVarToOrigVarQueryMap.keySet().toString(), e.getMessage());
+            throw new VariantAnnotationWebServiceException(
+                normVarToOrigVarQueries.stream().map((normVar) -> normVar.get(0)).collect(Collectors.toList()).toString(),
+                e.getMessage()
+            );
         } catch (ResourceMappingException e) {
             // TODO this indicates that web service returns an incompatible response
         }

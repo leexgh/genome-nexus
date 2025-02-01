@@ -189,8 +189,12 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields)
     {
-        return this.verifiedHgvsVariantAnnotationService.getAnnotations(
+        List<VariantAnnotation> variantAnnotations = this.verifiedHgvsVariantAnnotationService.getAnnotations(
             notationConverter.genomicToHgvs(genomicLocations), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        for (int i = 0; i < variantAnnotations.size(); i++) {
+            variantAnnotations.get(i).setOriginalVariantQuery(genomicLocations.get(i).toString());
+        }
+        return variantAnnotations;
     }
 
     @ApiOperation(value = "Retrieves VEP annotation for the provided genomic location", nickname = "fetchVariantAnnotationByGenomicLocationGET")
@@ -211,7 +215,9 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields) throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException
     {
-        return this.verifiedHgvsVariantAnnotationService.getAnnotation(notationConverter.genomicToHgvs(genomicLocation), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        VariantAnnotation annotation = this.verifiedHgvsVariantAnnotationService.getAnnotation(notationConverter.genomicToHgvs(genomicLocation), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        annotation.setOriginalVariantQuery(genomicLocation);
+        return annotation;
     }
 
     @ApiOperation(value = "Retrieves VEP annotation for the provided list of dbSNP ids", nickname = "fetchVariantAnnotationByIdPOST")
