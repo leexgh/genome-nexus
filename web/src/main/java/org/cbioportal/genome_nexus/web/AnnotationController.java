@@ -43,7 +43,7 @@ import org.cbioportal.genome_nexus.service.VariantAnnotationService;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationNotFoundException;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationQueryMixedFormatException;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationWebServiceException;
-import org.cbioportal.genome_nexus.service.internal.VerifiedHgvsVariantAnnotationService;
+import org.cbioportal.genome_nexus.service.internal.VerifiedVariantAnnotationService;
 import org.cbioportal.genome_nexus.util.TokenMapConverter;
 import org.cbioportal.genome_nexus.web.config.PublicApi;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,18 +61,18 @@ import org.springframework.web.bind.annotation.*;
 public class AnnotationController
 {
     private final VariantAnnotationService dbsnpAnnotationService;
-    private final VerifiedHgvsVariantAnnotationService verifiedHgvsVariantAnnotationService;
+    private final VerifiedVariantAnnotationService verifiedVariantAnnotationService;
     private final NotationConverter notationConverter;
     private final TokenMapConverter tokenMapConverter;
 
     @Autowired
     public AnnotationController(VariantAnnotationService dbsnpVariantAnnotationService,
-                               VerifiedHgvsVariantAnnotationService verifiedHgvsVariantAnnotationService,
+                               VerifiedVariantAnnotationService verifiedHgvsVariantAnnotationService,
                                NotationConverter notationConverter)
     {
         this.dbsnpAnnotationService = dbsnpVariantAnnotationService;
         this.notationConverter = notationConverter;
-        this.verifiedHgvsVariantAnnotationService = verifiedHgvsVariantAnnotationService;
+        this.verifiedVariantAnnotationService = verifiedHgvsVariantAnnotationService;
         this.tokenMapConverter = new TokenMapConverter();
     }
 
@@ -147,7 +147,7 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields) throws VariantAnnotationNotFoundException, VariantAnnotationQueryMixedFormatException, VariantAnnotationWebServiceException
     {
-        return this.verifiedHgvsVariantAnnotationService.getAnnotations(variants, isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        return this.verifiedVariantAnnotationService.getHgvsAnnotations(variants, isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
     }
 
     @ApiOperation(value = "Retrieves VEP annotation for the provided variant", nickname = "fetchVariantAnnotationGET")
@@ -168,7 +168,7 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields) throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException
     {
-        return this.verifiedHgvsVariantAnnotationService.getAnnotation(variant, isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        return this.verifiedVariantAnnotationService.getHgvsAnnotation(variant, isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
     }
 
     @ApiOperation(value = "Retrieves VEP annotation for the provided list of genomic locations", nickname = "fetchVariantAnnotationByGenomicLocationPOST")
@@ -189,8 +189,7 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields)
     {
-        List<VariantAnnotation> variantAnnotations = this.verifiedHgvsVariantAnnotationService.getAnnotations(
-            notationConverter.genomicToHgvs(genomicLocations), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        List<VariantAnnotation> variantAnnotations = this.verifiedVariantAnnotationService.getGenomicLocationAnnotations(genomicLocations, isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
         for (int i = 0; i < variantAnnotations.size(); i++) {
             variantAnnotations.get(i).setOriginalVariantQuery(genomicLocations.get(i).toString());
         }
@@ -215,7 +214,7 @@ public class AnnotationController
             @RequestParam(required = false)
             List<AnnotationField> fields) throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException
     {
-        VariantAnnotation annotation = this.verifiedHgvsVariantAnnotationService.getAnnotation(notationConverter.genomicToHgvs(genomicLocation), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
+        VariantAnnotation annotation = this.verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(genomicLocation), isoformOverrideSource, tokenMapConverter.convertToMap(token), fields);
         annotation.setOriginalVariantQuery(genomicLocation);
         return annotation;
     }

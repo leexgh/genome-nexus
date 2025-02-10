@@ -35,6 +35,7 @@ package org.cbioportal.genome_nexus.service.internal;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.model.AnnotationField;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationNotFoundException;
@@ -48,10 +49,10 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
-public class VerifiedHgvsVariantAnnotationServiceTest
+public class HgvsVariantAnnotationTest
 {
     // Tested Class
-    private VerifiedHgvsVariantAnnotationService verifiedHgvsVariantAnnotationService;
+    private VerifiedVariantAnnotationService verifiedVariantAnnotationService;
 
     @Mock
     private HgvsVariantAnnotationService hgvsVariantAnnotationService;
@@ -113,7 +114,7 @@ public class VerifiedHgvsVariantAnnotationServiceTest
     public void setUp()
         throws VariantAnnotationWebServiceException, VariantAnnotationNotFoundException, TestCaseInsufficentlyModeledException
     {
-        verifiedHgvsVariantAnnotationService = new VerifiedHgvsVariantAnnotationService(hgvsVariantAnnotationService);
+        verifiedVariantAnnotationService = new VerifiedVariantAnnotationService(hgvsVariantAnnotationService, new NotationConverter());
         initializeTestCaseLists();
         setUpServiceStubs(); // these are based on the test case lists
     }
@@ -286,9 +287,9 @@ public class VerifiedHgvsVariantAnnotationServiceTest
         for (VariantTestCase testCase : variantTestCaseList) {
             VariantAnnotation testResponse = null;
             if (supplyOtherParameters) {
-                testResponse = verifiedHgvsVariantAnnotationService.getAnnotation(testCase.originalVariantQuery, mockIsoformOverrideSource, mockTokenMap, mockFields);
+                testResponse = verifiedVariantAnnotationService.getHgvsAnnotation(testCase.originalVariantQuery, mockIsoformOverrideSource, mockTokenMap, mockFields);
             } else {
-                testResponse = verifiedHgvsVariantAnnotationService.getAnnotation(testCase.originalVariantQuery);
+                testResponse = verifiedVariantAnnotationService.getHgvsAnnotation(testCase.originalVariantQuery);
             }
             Assert.assertEquals(testCase.originalVariantQuery + " : response query field does not match request query string", testCase.originalVariantQuery, testResponse.getOriginalVariantQuery());
             if (testCase.expectedGnSuccessfullyAnnotated) {
@@ -310,9 +311,9 @@ public class VerifiedHgvsVariantAnnotationServiceTest
         List<String> queryHgvsList = variantTestCaseList.stream().map(t -> t.originalVariantQuery).collect(Collectors.toList());
         List<VariantAnnotation> variantResponse = null;
         if (supplyOtherParameters) {
-            variantResponse = verifiedHgvsVariantAnnotationService.getAnnotations(queryHgvsList, mockIsoformOverrideSource, mockTokenMap, mockFields);
+            variantResponse = verifiedVariantAnnotationService.getHgvsAnnotations(queryHgvsList, mockIsoformOverrideSource, mockTokenMap, mockFields);
         } else {
-            variantResponse = verifiedHgvsVariantAnnotationService.getAnnotations(queryHgvsList);
+            variantResponse = verifiedVariantAnnotationService.getHgvsAnnotations(queryHgvsList);
         }
         // check each element of response against expectations
         HashMap<String, VariantAnnotation> queryToResponse = new HashMap<String, VariantAnnotation>();

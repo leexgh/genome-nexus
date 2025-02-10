@@ -6,7 +6,6 @@ import org.apache.commons.logging.LogFactory;
 import org.cbioportal.genome_nexus.model.NucleotideContext;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
 import org.cbioportal.genome_nexus.service.NucleotideContextService;
-import org.cbioportal.genome_nexus.service.VariantAnnotationService;
 import org.cbioportal.genome_nexus.service.cached.CachedNucleotideContextFetcher;
 import org.cbioportal.genome_nexus.service.exception.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,14 +24,14 @@ public class NucleotideContextServiceImpl implements NucleotideContextService
     private static final Log LOG = LogFactory.getLog(NucleotideContextServiceImpl.class);
 
     private final CachedNucleotideContextFetcher cachedExternalResourceFetcher;
-    private final VariantAnnotationService variantAnnotationService;
+    private final VerifiedVariantAnnotationService variantAnnotationService;
 
     @Autowired
     public NucleotideContextServiceImpl(CachedNucleotideContextFetcher cachedExternalResourceFetcher,
-                                       VariantAnnotationService verifiedHgvsVariantAnnotationService)
+                                       VerifiedVariantAnnotationService verifiedVariantAnnotationService)
     {
         this.cachedExternalResourceFetcher = cachedExternalResourceFetcher;
-        this.variantAnnotationService = verifiedHgvsVariantAnnotationService;
+        this.variantAnnotationService = verifiedVariantAnnotationService;
     }
 
     /**
@@ -42,7 +41,7 @@ public class NucleotideContextServiceImpl implements NucleotideContextService
         throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException,
         NucleotideContextNotFoundException, NucleotideContextWebServiceException
     {
-        VariantAnnotation variantAnnotation = this.variantAnnotationService.getAnnotation(variant);
+        VariantAnnotation variantAnnotation = this.variantAnnotationService.getHgvsAnnotation(variant);
 
         return this.getNucleotideContextByVariantAnnotation(variantAnnotation);
     }
@@ -53,7 +52,7 @@ public class NucleotideContextServiceImpl implements NucleotideContextService
     public List<NucleotideContext> getNucleotideContext(List<String> variants)
     {
         List<NucleotideContext> nucleotideContexts = new ArrayList<>();
-        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(variants);
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getHgvsAnnotations(variants);
 
         for (VariantAnnotation variantAnnotation : variantAnnotations)
         {

@@ -38,7 +38,6 @@ import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.model.AnnotationField;
 import org.cbioportal.genome_nexus.model.GenomicLocation;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
-import org.cbioportal.genome_nexus.service.GenomicLocationAnnotationService;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationNotFoundException;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationWebServiceException;
 import org.junit.Assert;
@@ -50,16 +49,16 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
-public class VerifiedGenomicLocationAnnotationServiceTest
+public class GenomicLocationAnnotationTest
 {
     // Tested Class
-    private VerifiedGenomicLocationAnnotationServiceImpl verifiedGenomicLocationAnnotationServiceImpl;
+    private VerifiedVariantAnnotationService verifiedVariantAnnotationService;
 
     // Use the production NotationConverter utility
     private NotationConverter notationConverter = new NotationConverter();
 
     @Mock
-    private GenomicLocationAnnotationService glVariantAnnotationService;
+    private HgvsVariantAnnotationService hgvsVariantAnnotationService;
 
     // case lists
     public List<VariantTestCase> glSubstitutions = null;
@@ -116,7 +115,7 @@ public class VerifiedGenomicLocationAnnotationServiceTest
     public void setUp()
         throws VariantAnnotationWebServiceException, VariantAnnotationNotFoundException, TestCaseInsufficentlyModeledException
     {
-        verifiedGenomicLocationAnnotationServiceImpl = new VerifiedGenomicLocationAnnotationServiceImpl(glVariantAnnotationService, notationConverter);
+        verifiedVariantAnnotationService = new VerifiedVariantAnnotationService(hgvsVariantAnnotationService, notationConverter);
         initializeTestCaseLists();
         setUpServiceStubs(); // these are based on the test case lists
     }
@@ -230,16 +229,16 @@ public class VerifiedGenomicLocationAnnotationServiceTest
                     alleleStringStub);
             responseList.add(response);
             //response.setAnnotationJSON("{ \"originalVariantQuery\" : \"" + testCase.originalVariantQuery + "\", \"successfullyAnnotated\" : " + successfullyAnnotatedStub + ", \"allele\" : \"" + alleleStringStub + "\" }");
-            Mockito.when(glVariantAnnotationService.getAnnotation(testCase.originalVariantQuery)).thenReturn(response);
-            Mockito.when(glVariantAnnotationService.getAnnotation(testCase.originalVariantQuery, mockIsoformOverrideSource, mockTokenMap, mockFields)).thenReturn(response);
-            Mockito.when(glVariantAnnotationService.getAnnotation(genomicLocation)).thenReturn(response);
+            Mockito.when(verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(testCase.originalVariantQuery))).thenReturn(response);
+            Mockito.when(verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(testCase.originalVariantQuery), mockIsoformOverrideSource, mockTokenMap, mockFields)).thenReturn(response);
+            Mockito.when(verifiedVariantAnnotationService.getGenomicLocationAnnotation(genomicLocation)).thenReturn(response);
         }
         // create stubs for multi variant queries from built lists .. after jittering order
         // order of response not guaranteed to match order of query - business logic should handle this properly
         VariantAnnotation movedItem = responseList.remove(0);
         responseList.add(movedItem); // first element is now last
-        Mockito.when(glVariantAnnotationService.getAnnotations(queryGenomicLocationList)).thenReturn(responseList);
-        Mockito.when(glVariantAnnotationService.getAnnotations(queryGenomicLocationList, mockIsoformOverrideSource, mockTokenMap, mockFields)).thenReturn(responseList);
+        Mockito.when(verifiedVariantAnnotationService.getGenomicLocationAnnotations(queryGenomicLocationList)).thenReturn(responseList);
+        Mockito.when(verifiedVariantAnnotationService.getGenomicLocationAnnotations(queryGenomicLocationList, mockIsoformOverrideSource, mockTokenMap, mockFields)).thenReturn(responseList);
     }
 
     private void setUpServiceStubs()
@@ -258,9 +257,9 @@ public class VerifiedGenomicLocationAnnotationServiceTest
         for (VariantTestCase testCase : variantTestCaseList) {
             VariantAnnotation testResponse = null;
             if (supplyOtherParameters) {
-                testResponse = verifiedGenomicLocationAnnotationServiceImpl.getAnnotation(testCase.originalVariantQuery, mockIsoformOverrideSource, mockTokenMap, mockFields);
+                testResponse = verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(testCase.originalVariantQuery), mockIsoformOverrideSource, mockTokenMap, mockFields);
             } else {
-                testResponse = verifiedGenomicLocationAnnotationServiceImpl.getAnnotation(testCase.originalVariantQuery);
+                testResponse = verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(testCase.originalVariantQuery));
             }
             Assert.assertEquals(testCase.originalVariantQuery + " : response query field does not match request query string", testCase.originalVariantQuery, testResponse.getOriginalVariantQuery());
             if (testCase.expectedGnSuccessfullyAnnotated) {
@@ -281,7 +280,7 @@ public class VerifiedGenomicLocationAnnotationServiceTest
         for (VariantTestCase testCase : variantTestCaseList) {
             GenomicLocation genomicLocation = notationConverter.parseGenomicLocation(testCase.originalVariantQuery);
             VariantAnnotation testResponse = null;
-            testResponse = verifiedGenomicLocationAnnotationServiceImpl.getAnnotation(testCase.originalVariantQuery);
+            testResponse = verifiedVariantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(testCase.originalVariantQuery));
             Assert.assertEquals(genomicLocation.toString() + " : response query field does not match request query string", genomicLocation.toString(), testResponse.getOriginalVariantQuery());
             if (testCase.expectedGnSuccessfullyAnnotated) {
                 Assert.assertTrue(genomicLocation.toString() + " : expected successful annotation", testResponse.isSuccessfullyAnnotated());
@@ -302,9 +301,9 @@ public class VerifiedGenomicLocationAnnotationServiceTest
         List<GenomicLocation> queryGenomicLocations = variantTestCaseList.stream().map(t -> notationConverter.parseGenomicLocation(t.originalVariantQuery)).collect(Collectors.toList());
         List<VariantAnnotation> variantResponse = null;
         if (supplyOtherParameters) {
-            variantResponse = verifiedGenomicLocationAnnotationServiceImpl.getAnnotations(queryGenomicLocations, mockIsoformOverrideSource, mockTokenMap, mockFields);
+            variantResponse = verifiedVariantAnnotationService.getGenomicLocationAnnotations(queryGenomicLocations, mockIsoformOverrideSource, mockTokenMap, mockFields);
         } else {
-            variantResponse = verifiedGenomicLocationAnnotationServiceImpl.getAnnotations(queryGenomicLocations);
+            variantResponse = verifiedVariantAnnotationService.getGenomicLocationAnnotations(queryGenomicLocations);
         }
         // check each element of response against expectations
         HashMap<String, VariantAnnotation> queryToResponse = new HashMap<String, VariantAnnotation>();
