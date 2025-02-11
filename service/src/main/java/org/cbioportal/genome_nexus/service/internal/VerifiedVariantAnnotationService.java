@@ -168,7 +168,7 @@ public class VerifiedVariantAnnotationService
         } else if (variantType == VariantType.GENOMIC_LOCATION) {
             GenomicLocation genomicLocation = notationConverter.parseGenomicLocation(originalQuery);
             genomicLocation.setVariantAllele("-");
-            if (genomicLocation.getReferenceAllele() == "-") {
+            if (genomicLocation.getReferenceAllele().equals( "-")) {
                 return "";
             }
             followUpQuery = genomicLocation.toString();
