@@ -231,16 +231,16 @@ public class GenomicLocationAnnotationTest
             responseList.add(response);
             //response.setAnnotationJSON("{ \"originalVariantQuery\" : \"" + testCase.originalVariantQuery + "\", \"successfullyAnnotated\" : " + successfullyAnnotatedStub + ", \"allele\" : \"" + alleleStringStub + "\" }");
             Mockito.when(
-                verifiedVariantAnnotationService.getAnnotation(testCase.originalVariantQuery, VariantType.GENOMIC_LOCATION)
+                variantAnnotationService.getAnnotation(testCase.originalVariantQuery, VariantType.GENOMIC_LOCATION)
             ).thenReturn(response);
-            Mockito.when(verifiedVariantAnnotationService.getAnnotation(
+            Mockito.when(variantAnnotationService.getAnnotation(
                 testCase.originalVariantQuery,
                 VariantType.GENOMIC_LOCATION,
                 mockIsoformOverrideSource,
                 mockTokenMap,
                 mockFields)
             ).thenReturn(response);
-            Mockito.when(verifiedVariantAnnotationService.getAnnotation(
+            Mockito.when(variantAnnotationService.getAnnotation(
                 genomicLocation.toString(), 
                 VariantType.GENOMIC_LOCATION)
             ).thenReturn(response);
@@ -249,11 +249,11 @@ public class GenomicLocationAnnotationTest
         // order of response not guaranteed to match order of query - business logic should handle this properly
         VariantAnnotation movedItem = responseList.remove(0);
         responseList.add(movedItem); // first element is now last
-        Mockito.when(verifiedVariantAnnotationService.getAnnotations(
+        Mockito.when(variantAnnotationService.getAnnotations(
             notationConverter.genomicToString(queryGenomicLocationList),
             VariantType.GENOMIC_LOCATION
         )).thenReturn(responseList);
-        Mockito.when(verifiedVariantAnnotationService.getAnnotations(
+        Mockito.when(variantAnnotationService.getAnnotations(
             notationConverter.genomicToString(queryGenomicLocationList),
             VariantType.GENOMIC_LOCATION,
             mockIsoformOverrideSource,

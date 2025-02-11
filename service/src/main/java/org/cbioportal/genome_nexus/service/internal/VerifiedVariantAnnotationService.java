@@ -38,6 +38,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.model.AnnotationField;
+import org.cbioportal.genome_nexus.model.GenomicLocation;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
 import org.cbioportal.genome_nexus.model.VariantType;
 import org.cbioportal.genome_nexus.service.exception.VariantAnnotationNotFoundException;
@@ -128,14 +129,15 @@ public class VerifiedVariantAnnotationService
         }
         LOG.debug("verifying providedReferenceAllele : '" + ref + "'");
         String responseReferenceAllele = getReferenceAlleleFromAnnotation(annotation);
-        if (responseReferenceAllele.length() != ref.length()) {
+        if (responseReferenceAllele.length() != ref.length() ||
+         (variantType == VariantType.GENOMIC_LOCATION && responseReferenceAllele.equals("-"))) {
             // for altered length Deletion-Insertion responses, recover full reference allele with followup query
-            String followUpVariant = constructFollowUpQuery(annotation.getVariant());
-            // TODO: Make follow up variant based on originalVariantQuery?
+            String followUpVariant = constructFollowUpQuery(annotation.getOriginalVariantQuery(), variantType);
+
             if (followUpVariant.length() > 0) {
                 try {
                     LOG.debug("performing followup annotation request to get VEP genome assembly sequence : '" + ref + "'");
-                    VariantAnnotation followUpAnnotation = variantAnnotationService.getAnnotation(followUpVariant, VariantType.HGVS);
+                    VariantAnnotation followUpAnnotation = variantAnnotationService.getAnnotation(followUpVariant, variantType);
                     responseReferenceAllele = getReferenceAlleleFromAnnotation(followUpAnnotation);
                 } catch (VariantAnnotationNotFoundException|VariantAnnotationWebServiceException vae) {
                     // followup validation failed - could not verify provided allele, so accept failure
@@ -154,14 +156,24 @@ public class VerifiedVariantAnnotationService
         return createFailedAnnotation(annotation.getOriginalVariantQuery(), annotation.getVariant(), annotation.getErrorMessage());
     }
 
-    private String constructFollowUpQuery(String originalQuery)
+    private String constructFollowUpQuery(String originalQuery, VariantType variantType)
     {
-        // create a deletion variant covering the referenced genome positions
-        String followUpQuery = originalQuery.replaceFirst("ins.*|del.*|[A|T|C|G]>[A|T|C|G]","");
-        if (followUpQuery.length() == originalQuery.length()) {
-            return "";
+        String followUpQuery = "";
+        if (variantType == VariantType.HGVS) {
+            followUpQuery = originalQuery.replaceFirst("ins.*|del.*|[A|T|C|G]>[A|T|C|G]","");
+            if (followUpQuery.length() == originalQuery.length()) {
+                return "";
+            }
+            followUpQuery += "del";
+        } else if (variantType == VariantType.GENOMIC_LOCATION) {
+            GenomicLocation genomicLocation = notationConverter.parseGenomicLocation(originalQuery);
+            genomicLocation.setVariantAllele("-");
+            if (genomicLocation.getReferenceAllele() == "-") {
+                return "";
+            }
+            followUpQuery = genomicLocation.toString();
         }
-        return followUpQuery + "del";
+        return followUpQuery;
     }
 
     private String getReferenceAlleleFromAnnotation(VariantAnnotation annotation)

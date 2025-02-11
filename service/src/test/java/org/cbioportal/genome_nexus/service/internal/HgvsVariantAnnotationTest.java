@@ -125,7 +125,7 @@ public class HgvsVariantAnnotationTest
         if (hgvsSubstitutions == null) {
             hgvsSubstitutions = new ArrayList<VariantTestCase>();
             hgvsSubstitutions.add(new VariantTestCase("5:g.138163256C>T", true, "C/T", "valid substitution"));
-            hgvsSubstitutions.add(new VariantTestCase("5:g.138163256A>T", false, null, "discrepant RefAllele", "Reference allele extracted from response (-) does not match given reference allele (A)"));
+            hgvsSubstitutions.add(new VariantTestCase("5:g.138163256A>T", false, null, "discrepant RefAllele", "Reference allele extracted from response (C) does not match given reference allele (A)"));
             hgvsSubstitutions.add(new VariantTestCase("5:g.138163256>T", false, null, "missing RefAllele", "Line 1 skipped (5:g.138163256>T): Invalid allele string / or possible parsing error"));
             hgvsDeletions = new ArrayList<VariantTestCase>();
             hgvsDeletions.add(new VariantTestCase("5:g.138163256delC", true, "C/-", "1nt deletion with RefAllele"));
