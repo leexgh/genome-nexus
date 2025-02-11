@@ -1,9 +1,9 @@
 package org.cbioportal.genome_nexus.service.internal;
 
-import org.cbioportal.genome_nexus.component.annotation.NotationConverter;
 import org.cbioportal.genome_nexus.model.AnnotationField;
 import org.cbioportal.genome_nexus.model.CuriousCases;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
+import org.cbioportal.genome_nexus.model.VariantType;
 import org.cbioportal.genome_nexus.service.CuriousCasesService;
 import org.cbioportal.genome_nexus.service.exception.CuriousCasesNotFoundException;
 import org.cbioportal.genome_nexus.service.exception.CuriousCasesWebServiceException;
@@ -24,12 +24,10 @@ import java.util.*;
 @Service
 public class CuriousCasesServiceImpl implements CuriousCasesService {
     private final VerifiedVariantAnnotationService variantAnnotationService;
-    private final NotationConverter notationConverter;
 
     @Autowired
-    public CuriousCasesServiceImpl(VerifiedVariantAnnotationService verifiedVariantAnnotationService, NotationConverter notationConverter) {
+    public CuriousCasesServiceImpl(VerifiedVariantAnnotationService verifiedVariantAnnotationService) {
         this.variantAnnotationService = verifiedVariantAnnotationService;
-        this.notationConverter = notationConverter;
     }
 
     @Override
@@ -38,8 +36,9 @@ public class CuriousCasesServiceImpl implements CuriousCasesService {
         CuriousCases CuriousCases = null;
 
         try {
-            VariantAnnotation annotation = variantAnnotationService.getGenomicLocationAnnotation(
-                notationConverter.parseGenomicLocation(genomicLocation),
+            VariantAnnotation annotation = variantAnnotationService.getAnnotation(
+                genomicLocation,
+                VariantType.GENOMIC_LOCATION,
                 null, 
                 null, 
                 Arrays.asList(AnnotationField.ANNOTATION_SUMMARY));

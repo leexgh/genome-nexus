@@ -120,7 +120,7 @@ public class CancerHotspotServiceImpl implements CancerHotspotService
         throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException,
         CancerHotspotsWebServiceException
     {
-        VariantAnnotation variantAnnotation = this.variantAnnotationService.getHgvsAnnotation(variant);
+        VariantAnnotation variantAnnotation = this.variantAnnotationService.getAnnotation(variant, VariantType.HGVS);
         List<Hotspot> hotspots = new ArrayList<>();
 
         if (variantAnnotation != null)
@@ -135,7 +135,7 @@ public class CancerHotspotServiceImpl implements CancerHotspotService
     public List<AggregatedHotspots> getHotspotAnnotationsByVariants(List<String> variants)
         throws CancerHotspotsWebServiceException
     {
-        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getHgvsAnnotations(variants);
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(variants, VariantType.HGVS);
 
         List<AggregatedHotspots> hotspots = new ArrayList<>();
 
@@ -156,7 +156,7 @@ public class CancerHotspotServiceImpl implements CancerHotspotService
         throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException,
         CancerHotspotsWebServiceException
     {
-        VariantAnnotation variantAnnotation = variantAnnotationService.getGenomicLocationAnnotation(notationConverter.parseGenomicLocation(genomicLocation));
+        VariantAnnotation variantAnnotation = variantAnnotationService.getAnnotation(genomicLocation, VariantType.GENOMIC_LOCATION);
         return this.getHotspotAnnotations(variantAnnotation);
     }
 
@@ -164,7 +164,10 @@ public class CancerHotspotServiceImpl implements CancerHotspotService
     public List<AggregatedHotspots> getHotspotAnnotationsByGenomicLocations(List<GenomicLocation> genomicLocations)
         throws CancerHotspotsWebServiceException
     {
-        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getGenomicLocationAnnotations(genomicLocations);
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(
+            notationConverter.genomicToString(genomicLocations),
+            VariantType.GENOMIC_LOCATION
+        );
         List<AggregatedHotspots> hotspots = new ArrayList<>();
         for (int i = 0; i < variantAnnotations.size(); i++)
         {

@@ -5,6 +5,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cbioportal.genome_nexus.model.NucleotideContext;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
+import org.cbioportal.genome_nexus.model.VariantType;
 import org.cbioportal.genome_nexus.service.NucleotideContextService;
 import org.cbioportal.genome_nexus.service.cached.CachedNucleotideContextFetcher;
 import org.cbioportal.genome_nexus.service.exception.*;
@@ -41,7 +42,7 @@ public class NucleotideContextServiceImpl implements NucleotideContextService
         throws VariantAnnotationNotFoundException, VariantAnnotationWebServiceException,
         NucleotideContextNotFoundException, NucleotideContextWebServiceException
     {
-        VariantAnnotation variantAnnotation = this.variantAnnotationService.getHgvsAnnotation(variant);
+        VariantAnnotation variantAnnotation = this.variantAnnotationService.getAnnotation(variant, VariantType.HGVS);
 
         return this.getNucleotideContextByVariantAnnotation(variantAnnotation);
     }
@@ -52,7 +53,7 @@ public class NucleotideContextServiceImpl implements NucleotideContextService
     public List<NucleotideContext> getNucleotideContext(List<String> variants)
     {
         List<NucleotideContext> nucleotideContexts = new ArrayList<>();
-        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getHgvsAnnotations(variants);
+        List<VariantAnnotation> variantAnnotations = this.variantAnnotationService.getAnnotations(variants, VariantType.HGVS);
 
         for (VariantAnnotation variantAnnotation : variantAnnotations)
         {

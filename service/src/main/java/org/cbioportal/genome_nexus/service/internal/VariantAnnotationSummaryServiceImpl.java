@@ -3,6 +3,7 @@ package org.cbioportal.genome_nexus.service.internal;
 import org.cbioportal.genome_nexus.component.annotation.*;
 import org.cbioportal.genome_nexus.model.TranscriptConsequenceSummary;
 import org.cbioportal.genome_nexus.model.VariantAnnotationSummary;
+import org.cbioportal.genome_nexus.model.VariantType;
 import org.cbioportal.genome_nexus.model.IntergenicConsequenceSummary;
 import org.cbioportal.genome_nexus.model.IntergenicConsequences;
 import org.cbioportal.genome_nexus.model.RevisedProteinEffectJsonRecord;
@@ -100,7 +101,7 @@ public class VariantAnnotationSummaryServiceImpl implements VariantAnnotationSum
         throws VariantAnnotationWebServiceException, VariantAnnotationNotFoundException
     {
         return this.getAnnotationSummaryForCanonical(
-            this.variantAnnotationService.getHgvsAnnotation(variant, isoformOverrideSource, null, null)
+            this.variantAnnotationService.getAnnotation(variant, VariantType.HGVS, isoformOverrideSource, null, null)
         );
     }
 
@@ -150,7 +151,7 @@ public class VariantAnnotationSummaryServiceImpl implements VariantAnnotationSum
         throws VariantAnnotationWebServiceException, VariantAnnotationNotFoundException
     {
         return this.getAnnotationSummary(
-            this.variantAnnotationService.getHgvsAnnotation(variant, isoformOverrideSource, null, null)
+            this.variantAnnotationService.getAnnotation(variant, VariantType.HGVS, isoformOverrideSource, null, null)
         );
     }
 
@@ -159,7 +160,7 @@ public class VariantAnnotationSummaryServiceImpl implements VariantAnnotationSum
         List<VariantAnnotationSummary> summaries = new ArrayList<>();
 
         List<VariantAnnotation> annotations =
-            this.variantAnnotationService.getHgvsAnnotations(variants, isoformOverrideSource, null, null);
+            this.variantAnnotationService.getAnnotations(variants, VariantType.HGVS, isoformOverrideSource, null, null);
 
         for (VariantAnnotation annotation: annotations) {
             summaries.add(this.getAnnotationSummary(annotation));
@@ -176,7 +177,7 @@ public class VariantAnnotationSummaryServiceImpl implements VariantAnnotationSum
         List<VariantAnnotationSummary> summaries = new ArrayList<>();
 
         List<VariantAnnotation> annotations =
-            this.variantAnnotationService.getHgvsAnnotations(variants, isoformOverrideSource, null, null);
+            this.variantAnnotationService.getAnnotations(variants, VariantType.HGVS, isoformOverrideSource, null, null);
 
         for (VariantAnnotation annotation: annotations) {
             summaries.add(this.getAnnotationSummaryForCanonical(annotation));
