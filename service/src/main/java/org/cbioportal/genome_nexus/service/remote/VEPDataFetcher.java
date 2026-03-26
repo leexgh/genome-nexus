@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.DBObject;
+import com.mongodb.util.JSON;
 
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,8 @@ public class VEPDataFetcher extends BaseExternalResourceFetcher<VariantAnnotatio
     {
         uri = uri.replace("/" + PLACEHOLDER, "");
 
-        return restTemplate.postForObject(uri, requestBody, BasicDBList.class);
+        String json = fixNanStrings(restTemplate.postForObject(uri, requestBody, String.class));
+        return (BasicDBList) JSON.parse(json);
     }
 
     @Override
@@ -57,5 +59,12 @@ public class VEPDataFetcher extends BaseExternalResourceFetcher<VariantAnnotatio
 
     public ExternalResourceTransformer getTransformer() {
         return transformer;
+    }
+
+    private String fixNanStrings(String json) {
+        return json.replaceAll(
+            "(?<![\"\\w])-nan(?![\"\\w])",
+            "\"-nan\""
+        );
     }
 }
