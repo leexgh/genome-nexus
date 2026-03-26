@@ -62,9 +62,9 @@ public class VEPDataFetcher extends BaseExternalResourceFetcher<VariantAnnotatio
     }
 
     private String fixNanStrings(String json) {
-    return json.replaceAll(
-        "(?<![\"\\w])-nan(?![\"\\w])",
-        "\"-nan\""
-    );
-}
+        return json.replaceAll(
+            "(?<![\"\\w])-nan(?![\"\\w])",
+            "\"-nan\""
+        );
+    }
 }
