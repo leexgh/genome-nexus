@@ -1,5 +1,7 @@
 package org.cbioportal.genome_nexus.component.annotation;
 
+import java.util.List;
+
 import org.cbioportal.genome_nexus.model.IntegerRange;
 import org.cbioportal.genome_nexus.model.TranscriptConsequence;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
@@ -7,8 +9,6 @@ import org.cbioportal.genome_nexus.util.Numerical;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 public class ProteinPositionResolver
@@ -36,6 +36,15 @@ public class ProteinPositionResolver
         // special case for splice
         if (proteinChange != null &&
             proteinChange.toLowerCase().contains("x"))
+        {
+            proteinPos = this.extractProteinPos(proteinChange);
+        }
+        // special case for splice region variants (e.g. p.*963*, p.*963fs*)
+        // VEP does not provide protein_start for splice_region_variant intronic positions,
+        // so we extract the position from the computed hgvspShort string
+        if (proteinPos == null &&
+            proteinChange != null &&
+            proteinChange.matches("p\\.\\*\\d+.*"))
         {
             proteinPos = this.extractProteinPos(proteinChange);
         }

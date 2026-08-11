@@ -92,4 +92,32 @@ public class ProteinPositionResolverTest
         assertEquals("Protein end position should be derived from protein change for splice sites",
             proteinPos.getEnd(), new Integer(307));
     }
+
+    @Test
+    public void resolveProteinChangeForStopCodonPosition()
+    {
+        VariantAnnotation annotation = new VariantAnnotation();
+        annotation.setVariantId("7:g.116411872_116411900del");
+
+        // VEP provides no protein_start for splice_region_variant intronic positions
+        TranscriptConsequence transcriptNoProteinPos = new TranscriptConsequence();
+
+        Mockito.when(this.proteinChangeResolver.resolveHgvspShort(annotation, transcriptNoProteinPos)).thenReturn("p.*963*");
+
+        IntegerRange proteinPos = proteinPositionResolver.resolve(annotation, transcriptNoProteinPos);
+
+        assertEquals("Protein start position should be extracted from p.*963* hgvspShort",
+            proteinPos.getStart(), new Integer(963));
+
+        assertEquals("Protein end position should be extracted from p.*963* hgvspShort",
+            proteinPos.getEnd(), new Integer(963));
+
+        // frameshift variant of same pattern
+        Mockito.when(this.proteinChangeResolver.resolveHgvspShort(annotation, transcriptNoProteinPos)).thenReturn("p.*963fs*");
+
+        proteinPos = proteinPositionResolver.resolve(annotation, transcriptNoProteinPos);
+
+        assertEquals("Protein start position should be extracted from p.*963fs* hgvspShort",
+            proteinPos.getStart(), new Integer(963));
+    }
 }
