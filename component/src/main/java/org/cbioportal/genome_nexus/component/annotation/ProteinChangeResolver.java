@@ -127,8 +127,12 @@ public class ProteinChangeResolver
 
         if (m.matches())
         {
-            // "c.*" represents for UTR
-            if (hgvsc.contains("c.*")) {
+            // "c.*" represents for UTR. Only bail out here for non-splice-site
+            // consequences (e.g. silent mutations) -- a splice donor/acceptor site
+            // landing in the UTR still has a computable pseudo-protein position and
+            // should go through the SPLICE_SITE_VARIANTS branch below instead.
+            if (hgvsc.contains("c.*") &&
+                !SPLICE_SITE_VARIANTS.contains(transcriptConsequence.getConsequenceTerms().get(0))) {
                 return null;
             }
 

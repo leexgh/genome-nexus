@@ -119,6 +119,15 @@ public class ProteinChangeResolverTest
             this.proteinChangeResolver.resolveHgvspShort(variantMockData.get("16:g.9057113_9057114insCTG"))
         );
 
+        // Splice donor variant on a transcript whose HGVSc falls in the 3' UTR
+        // (c.*8+2T>C, i.e. downstream of the stop codon). The "c.*" UTR guard in
+        // resolveHgvspShortFromHgvsc() used to return null for this before ever
+        // reaching the splice-site branch, even though the position is computable.
+        assertEquals(
+            "p.X3_splice",
+            this.proteinChangeResolver.resolveHgvspShort(variantMockData.get("12:g.12871890T>C"))
+        );
+
         assertEquals(
             "p.X218_splice",
             this.proteinChangeResolver.resolveHgvspShort(variantMockData.get("19:g.46141892_46141893delinsAA"))
