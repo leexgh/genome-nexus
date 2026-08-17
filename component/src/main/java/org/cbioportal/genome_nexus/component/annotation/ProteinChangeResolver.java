@@ -8,8 +8,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.cbioportal.genome_nexus.model.EnsemblTranscript;
 import org.cbioportal.genome_nexus.model.TranscriptConsequence;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
+import org.cbioportal.genome_nexus.persistence.EnsemblRepository;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -30,19 +32,26 @@ public class ProteinChangeResolver
 
     private final CanonicalTranscriptResolver canonicalTranscriptResolver;
     private final VariantClassificationResolver variantClassificationResolver;
+    private final EnsemblRepository ensemblRepository;
     private final Pattern cDnaExtractor;
     private final Pattern cDnaRangeSecondPosExtractor;
     private final Pattern utrStartRangePattern;
+    private final Pattern utrStartSplicePattern;
 
     @Autowired
     public ProteinChangeResolver(CanonicalTranscriptResolver canonicalTranscriptResolver,
-                                 VariantClassificationResolver variantClassificationResolver)
+                                 VariantClassificationResolver variantClassificationResolver,
+                                 EnsemblRepository ensemblRepository)
     {
         this.canonicalTranscriptResolver = canonicalTranscriptResolver;
         this.variantClassificationResolver = variantClassificationResolver;
+        this.ensemblRepository = ensemblRepository;
         this.cDnaExtractor = Pattern.compile(".*[cn].-?\\*?(\\d+).*");
         this.cDnaRangeSecondPosExtractor = Pattern.compile(".*_(\\d+).*");
         this.utrStartRangePattern = Pattern.compile(".*[cn]\\.-\\d+_.*");
+        // Single-position 5' UTR splice site like c.-309+2T>C (matches "-\d+[+-]").
+        // The range form c.-309_60+142del is handled separately by utrStartRangePattern.
+        this.utrStartSplicePattern = Pattern.compile(".*[cn]\\.-\\d+[+-].*");
     }
 
     /**
@@ -154,6 +163,23 @@ public class ProteinChangeResolver
 
             if (SPLICE_SITE_VARIANTS.contains(transcriptConsequence.getConsequenceTerms().get(0)))
             {
+                // For 3' UTR splice sites (hgvsc like c.*8+2), the raw (cPos+2)/3
+                // would anchor near the N-terminus even though the splice junction
+                // sits past the stop codon. Use the transcript's protein length so
+                // the marker lands at the C-terminus where the biology is.
+                if (hgvsc.contains("c.*")) {
+                    Integer proteinLength = this.resolveProteinLength(transcriptConsequence);
+                    if (proteinLength == null) {
+                        return null;
+                    }
+                    pPos = proteinLength;
+                }
+                // For 5' UTR splice sites (hgvsc like c.-309+2), the raw (cPos+2)/3
+                // treats the upstream nt count as a CDS position and lands somewhere
+                // in the middle of the protein. Anchor at the N-terminus instead.
+                else if (this.utrStartSplicePattern.matcher(hgvsc).matches()) {
+                    pPos = 1;
+                }
                 hgvspShort = "p.X" + String.valueOf(pPos) + "_splice";
             }
             else if (transcriptConsequence.getAminoAcids() == null)
@@ -173,6 +199,20 @@ public class ProteinChangeResolver
         }
 
         return hgvspShort;
+    }
+
+    @Nullable
+    private Integer resolveProteinLength(TranscriptConsequence transcriptConsequence)
+    {
+        if (this.ensemblRepository == null ||
+            transcriptConsequence == null ||
+            transcriptConsequence.getTranscriptId() == null)
+        {
+            return null;
+        }
+        EnsemblTranscript ensemblTranscript =
+            this.ensemblRepository.findOneByTranscriptId(transcriptConsequence.getTranscriptId());
+        return ensemblTranscript != null ? ensemblTranscript.getProteinLength() : null;
     }
 
     @Nullable

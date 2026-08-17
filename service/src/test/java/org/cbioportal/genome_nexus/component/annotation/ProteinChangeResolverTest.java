@@ -3,8 +3,10 @@ package org.cbioportal.genome_nexus.component.annotation;
 import java.io.IOException;
 import java.util.Map;
 
+import org.cbioportal.genome_nexus.model.EnsemblTranscript;
 import org.cbioportal.genome_nexus.model.TranscriptConsequence;
 import org.cbioportal.genome_nexus.model.VariantAnnotation;
+import org.cbioportal.genome_nexus.persistence.EnsemblRepository;
 import org.cbioportal.genome_nexus.service.mock.CanonicalTranscriptResolverMocker;
 import org.cbioportal.genome_nexus.service.mock.VariantAnnotationMockData;
 import org.cbioportal.genome_nexus.service.mock.VariantClassificationResolverMocker;
@@ -14,6 +16,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
@@ -28,6 +31,9 @@ public class ProteinChangeResolverTest
     @Mock
     private CanonicalTranscriptResolver canonicalTranscriptResolver;
 
+    @Mock
+    private EnsemblRepository ensemblRepository;
+
     private final VariantAnnotationMockData variantAnnotationMockData = new VariantAnnotationMockData();
     private final CanonicalTranscriptResolverMocker canonicalTranscriptResolverMocker = new CanonicalTranscriptResolverMocker();
     private final VariantClassificationResolverMocker variantClassificationResolverMocker = new VariantClassificationResolverMocker();
@@ -38,6 +44,14 @@ public class ProteinChangeResolverTest
         Map<String, VariantAnnotation> variantMockData = this.variantAnnotationMockData.generateData();
         this.canonicalTranscriptResolverMocker.mockMethods(variantMockData, this.canonicalTranscriptResolver);
         this.variantClassificationResolverMocker.mockMethods(variantMockData, this.variantClassificationResolver);
+
+        // CDKN1B canonical (ENST00000228872) has 198 aa; used to anchor the
+        // p.X{N}_splice marker at the C-terminus for a 3' UTR splice donor.
+        EnsemblTranscript cdkn1bTranscript = new EnsemblTranscript();
+        cdkn1bTranscript.setTranscriptId("ENST00000228872");
+        cdkn1bTranscript.setProteinLength(198);
+        Mockito.when(this.ensemblRepository.findOneByTranscriptId("ENST00000228872"))
+            .thenReturn(cdkn1bTranscript);
 
         assertEquals(
             "p.L431Vfs*22",
@@ -120,11 +134,12 @@ public class ProteinChangeResolverTest
         );
 
         // Splice donor variant on a transcript whose HGVSc falls in the 3' UTR
-        // (c.*8+2T>C, i.e. downstream of the stop codon). The "c.*" UTR guard in
-        // resolveHgvspShortFromHgvsc() used to return null for this before ever
-        // reaching the splice-site branch, even though the position is computable.
+        // (c.*8+2T>C, i.e. downstream of the stop codon). The naive (cPos+2)/3
+        // derivation would anchor the marker at the N-terminus (p.X3), but the
+        // splice junction actually sits past the stop codon -- anchor at the
+        // transcript's protein length instead (CDKN1B p27 = 198 aa).
         assertEquals(
-            "p.X3_splice",
+            "p.X198_splice",
             this.proteinChangeResolver.resolveHgvspShort(variantMockData.get("12:g.12871890T>C"))
         );
 
