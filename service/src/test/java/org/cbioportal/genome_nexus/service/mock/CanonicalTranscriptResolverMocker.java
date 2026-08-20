@@ -97,6 +97,12 @@ public class CanonicalTranscriptResolverMocker
         );
 
         Mockito.when(
+            canonicalTranscriptResolver.resolve(variantMockData.get("12:g.12871890T>C"))
+        ).thenReturn(
+            variantMockData.get("12:g.12871890T>C").getTranscriptConsequences().get(0)
+        );
+
+        Mockito.when(
             canonicalTranscriptResolver.resolve(variantMockData.get("13:g.28608258_28608275del"))
         ).thenReturn(
             variantMockData.get("13:g.28608258_28608275del").getTranscriptConsequences().get(0)

@@ -1,0 +1,74 @@
+{
+    "variant": "12:g.12871890T>C",
+    "id": "12:g.12871890T>C",
+    "assembly_name": "GRCh37",
+    "seq_region_name": "12",
+    "start": 12871890,
+    "end": 12871890,
+    "allele_string": "T/C",
+    "strand": 1,
+    "most_severe_consequence": "splice_donor_variant",
+    "transcript_consequences": [
+        {
+            "transcript_id": "ENST00000228872",
+            "hgvsc": "ENST00000228872.4:c.*8+2T>C",
+            "variant_allele": "C",
+            "protein_id": "ENSP00000228872",
+            "gene_symbol": "CDKN1B",
+            "gene_id": "ENSG00000111276",
+            "hgnc_id": 1785,
+            "canonical": "1",
+            "refseq_transcript_ids": [
+                "NM_004064.3"
+            ],
+            "consequence_terms": [
+                "splice_donor_variant"
+            ]
+        },
+        {
+            "transcript_id": "ENST00000396340",
+            "hgvsc": "ENST00000396340.1:c.475+642T>C",
+            "variant_allele": "C",
+            "protein_id": "ENSP00000379629",
+            "gene_symbol": "CDKN1B",
+            "gene_id": "ENSG00000111276",
+            "hgnc_id": 1785,
+            "consequence_terms": [
+                "intron_variant"
+            ]
+        },
+        {
+            "transcript_id": "ENST00000442489",
+            "hgvsc": "ENST00000442489.1:c.*8+2T>C",
+            "variant_allele": "C",
+            "protein_id": "ENSP00000407597",
+            "gene_symbol": "CDKN1B",
+            "gene_id": "ENSG00000111276",
+            "hgnc_id": 1785,
+            "consequence_terms": [
+                "splice_donor_variant"
+            ]
+        },
+        {
+            "transcript_id": "ENST00000477087",
+            "hgvsc": "ENST00000477087.1:n.284+2T>C",
+            "variant_allele": "C",
+            "gene_symbol": "CDKN1B",
+            "gene_id": "ENSG00000111276",
+            "hgnc_id": 1785,
+            "consequence_terms": [
+                "splice_donor_variant",
+                "non_coding_transcript_variant"
+            ]
+        },
+        {
+            "transcript_id": "ENST00000542291",
+            "variant_allele": "C",
+            "gene_symbol": "RP11-180M15.4",
+            "gene_id": "ENSG00000256658",
+            "consequence_terms": [
+                "downstream_gene_variant"
+            ]
+        }
+    ]
+}
