@@ -1,9 +1,13 @@
 package org.cbioportal.genome_nexus.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
+
+import org.cbioportal.genome_nexus.util.IsoformOverrideSource;
 
 /**
  * Ensembl canonical mappings from Hugo Symbol to Ensembl Gene and Transcript.
@@ -23,6 +27,16 @@ public class EnsemblCanonical
     private String uniprotCanonicalTranscriptId;
     @Field(value="mskcc_canonical_transcript")
     private String mskccCanonicalTranscriptId;
+    // A gene can legitimately have more than one canonical transcript (e.g. CDKN2A's two
+    // reading frames, p14ARF and p16INK4A). The importer writes the primary one above and
+    // any others here, comma separated.
+    @Field(value="mskcc_canonical_transcript_additional")
+    private String mskccAdditionalCanonicalTranscriptIds;
+    // Extra gene symbols that name one specific transcript of this gene, as
+    // "alias:transcriptId" pairs (e.g. "CDKN2Ap14:ENST00000579755, CDKN2Ap16:ENST00000304494").
+    // Source-neutral: an alias names a reading frame, not a particular isoform override source.
+    @Field(value="canonical_transcript_alias")
+    private String canonicalTranscriptAliases;
     @Field(value="ensembl_canonical_transcript_version")
     private String ensemblCanonicalTranscriptVersion;
     @Field(value="genome_nexus_canonical_transcript_version")
@@ -59,27 +73,100 @@ public class EnsemblCanonical
         return output;
     }
 
+    /**
+     * Canonical transcript for the requested isoform override source. An omitted, blank or
+     * unrecognised source resolves to mskcc via {@link IsoformOverrideSource#getOrDefault},
+     * so every caller gets the same default rather than each deciding for itself.
+     */
     public String getCanonicalTranscriptId(String isoformOverrideSource) {
-        String canonicalTranscriptId;
-        if (isoformOverrideSource == null) {
-            return this.uniprotCanonicalTranscriptId;
-        } else {
-            switch (isoformOverrideSource) {
-                case "mskcc":
-                    canonicalTranscriptId = this.mskccCanonicalTranscriptId;
-                    break;
-                case "genome_nexus":
-                    canonicalTranscriptId = this.genomeNexusCanonicalTranscriptId;
-                    break;
-                case "ensembl":
-                    canonicalTranscriptId = this.ensemblCanonicalTranscriptId;
-                    break;
-                default:
-                    canonicalTranscriptId = this.uniprotCanonicalTranscriptId;
-                    break;
-            }
-            return canonicalTranscriptId;
+        switch (IsoformOverrideSource.getOrDefault(isoformOverrideSource)) {
+            case IsoformOverrideSource.GENOME_NEXUS:
+                return this.genomeNexusCanonicalTranscriptId;
+            case IsoformOverrideSource.ENSEMBL:
+                return this.ensemblCanonicalTranscriptId;
+            case IsoformOverrideSource.UNIPROT:
+                return this.uniprotCanonicalTranscriptId;
+            case IsoformOverrideSource.MSKCC:
+            default:
+                return this.mskccCanonicalTranscriptId;
         }
+    }
+
+    /**
+     * Canonical transcripts beyond the primary one returned by
+     * {@link #getCanonicalTranscriptId(String)}. Only the mskcc source carries these today;
+     * every other source returns an empty array. An omitted or unrecognised source resolves
+     * to mskcc, matching {@link #getCanonicalTranscriptId(String)}.
+     */
+    public String[] getAdditionalCanonicalTranscriptIds(String isoformOverrideSource) {
+        if (IsoformOverrideSource.MSKCC.equals(IsoformOverrideSource.getOrDefault(isoformOverrideSource))
+            && this.mskccAdditionalCanonicalTranscriptIds != null) {
+            String[] additional = EnsemblCanonical.splitByComma(this.mskccAdditionalCanonicalTranscriptIds);
+            if (additional != null) {
+                return additional;
+            }
+        }
+        return new String[0];
+    }
+
+    /**
+     * Transcript named by an alias gene symbol (e.g. "CDKN2Ap14"), or null when the symbol is
+     * not an alias for this gene. Matching is case insensitive. Returns null on documents
+     * imported before the alias column existed, so callers fall back to the canonical pick.
+     */
+    public String getCanonicalTranscriptIdForAliasSymbol(String symbol) {
+        if (symbol == null || this.canonicalTranscriptAliases == null) {
+            return null;
+        }
+        String[] pairs = EnsemblCanonical.splitByComma(this.canonicalTranscriptAliases);
+        if (pairs == null) {
+            return null;
+        }
+        for (String pair : pairs) {
+            int separator = pair.indexOf(':');
+            if (separator <= 0 || separator == pair.length() - 1) {
+                continue;
+            }
+            if (pair.substring(0, separator).trim().equalsIgnoreCase(symbol.trim())) {
+                return pair.substring(separator + 1).trim();
+            }
+        }
+        return null;
+    }
+
+    /** Alias gene symbols defined for this gene; empty when the document has none. */
+    public String[] getAliasSymbols() {
+        if (this.canonicalTranscriptAliases == null) {
+            return new String[0];
+        }
+        String[] pairs = EnsemblCanonical.splitByComma(this.canonicalTranscriptAliases);
+        if (pairs == null) {
+            return new String[0];
+        }
+        List<String> symbols = new ArrayList<>();
+        for (String pair : pairs) {
+            int separator = pair.indexOf(':');
+            if (separator > 0) {
+                symbols.add(pair.substring(0, separator).trim());
+            }
+        }
+        return symbols.toArray(new String[0]);
+    }
+
+    public String getCanonicalTranscriptAliases() {
+        return this.canonicalTranscriptAliases;
+    }
+
+    public void setCanonicalTranscriptAliases(String canonicalTranscriptAliases) {
+        this.canonicalTranscriptAliases = canonicalTranscriptAliases;
+    }
+
+    public String getMskccAdditionalCanonicalTranscriptIds() {
+        return this.mskccAdditionalCanonicalTranscriptIds;
+    }
+
+    public void setMskccAdditionalCanonicalTranscriptIds(String mskccAdditionalCanonicalTranscriptIds) {
+        this.mskccAdditionalCanonicalTranscriptIds = mskccAdditionalCanonicalTranscriptIds;
     }
 
     public String getHugoSymbol() {

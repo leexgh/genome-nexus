@@ -1,22 +1,39 @@
 # Frequently Asked Questions
 
-## What is Genome Nexus?
+## Contents
+
+- [About Genome Nexus](#about-genome-nexus) — 2 questions
+- [Making requests](#making-requests) — 4 questions
+- [Transcript selection](#transcript-selection) — 2 questions
+- [Protein domains](#protein-domains) — 2 questions
+- [Protein change and HGVS](#protein-change-and-hgvs) — 5 questions
+- [Consequence and variant classification](#consequence-and-variant-classification) — 3 questions
+- [Empty or missing results](#empty-or-missing-results) — 3 questions
+- [Caching and instance differences](#caching-and-instance-differences) — 3 questions
+
+---
+
+## About Genome Nexus
+
+### What is Genome Nexus?
 
 Genome Nexus is a variant annotation and interpretation service. It takes a genomic variant as input, queries [VEP (Variant Effect Predictor)](https://www.ensembl.org/info/docs/tools/vep/index.html) for functional consequences, optionally enriches the result with data from external sources (gnomAD, ClinVar, COSMIC, signaldb, Mutation Assessor, etc.), and returns structured JSON containing transcript consequences, protein changes, variant classifications, and more.
 
 ---
 
-## What genome builds are supported?
+### What genome builds are supported?
 
 GRCh37 (hg19) and GRCh38 (hg38) are both supported, but as **separate deployments** — each instance is backed by a build-specific VEP endpoint. The build is fixed at deployment time in `application.properties`. There is no runtime parameter to switch builds; you must query the instance that matches your variant coordinates.
 
 ---
 
-## What variant input formats are accepted?
+## Making requests
+
+### What variant input formats are accepted?
 
 Genome Nexus accepts two input formats: **genomic HGVS notation** and **genomic location** (chromosome, start, end, ref, alt).
 
-### Genomic HGVS notation
+#### Genomic HGVS notation
 
 Used with the `/annotation` endpoints. The string is forwarded directly to VEP.
 
@@ -28,7 +45,7 @@ Used with the `/annotation` endpoints. The string is forwarded directly to VEP.
 | Deletion-insertion | `19:g.46141892_46141893delinsAA` |
 | Multi-nucleotide | `12:g.25398285_25398286delinsAA` |
 
-### Genomic location
+#### Genomic location
 
 Use the `/annotation/genomic` endpoints. Genome Nexus converts the location to HGVS internally before querying VEP.
 
@@ -56,22 +73,11 @@ Alleles must contain only the characters `A`, `C`, `G`, `T`, or `-` (deletion pl
 
 ---
 
-## What is the difference between `/annotation` and `/annotation/summary`?
-
-| Endpoint | Returns |
-|---|---|
-| `GET /annotation/{variant}` | Raw VEP output plus any requested enrichments (my_variant_info, nucleotide context, etc.). All VEP fields are present. |
-| `GET /annotation/summary/{variant}` | A processed summary: resolved `variantClassification`, `HGVSp_Short`, protein position, Hugo symbol, RefSeq IDs, and other derived fields. Raw VEP fields are omitted. |
-
-The summary endpoint calls the annotation endpoint internally and then runs the resolver pipeline on top of the result. Use `/annotation` when you need raw VEP fields; use `/annotation/summary` when you want pre-resolved, MAF-compatible fields.
-
----
-
-## How do I annotate multiple variants at once?
+### How do I annotate multiple variants at once?
 
 All annotation endpoints have a batch POST variant. Results are returned in the same order as the input. Variants that fail VEP annotation still appear in the response with `successfully_annotated: false` so array indices stay aligned.
 
-### HGVS notation — array of strings
+#### HGVS notation — array of strings
 
 ```
 POST /annotation
@@ -80,7 +86,7 @@ Content-Type: application/json
 ["7:g.140453136A>T", "17:g.41242962_41242963insGA", "22:g.36689419_36689421del"]
 ```
 
-### Genomic location — array of objects
+#### Genomic location — array of objects
 
 ```
 POST /annotation/genomic
@@ -106,7 +112,18 @@ Content-Type: application/json
 
 ---
 
-## What does the `fields` parameter do?
+### What is the difference between `/annotation` and `/annotation/summary`?
+
+| Endpoint | Returns |
+|---|---|
+| `GET /annotation/{variant}` | Raw VEP output plus any requested enrichments (my_variant_info, nucleotide context, etc.). All VEP fields are present. |
+| `GET /annotation/summary/{variant}` | A processed summary: resolved `variantClassification`, `HGVSp_Short`, protein position, Hugo symbol, RefSeq IDs, and other derived fields. Raw VEP fields are omitted. |
+
+The summary endpoint calls the annotation endpoint internally and then runs the resolver pipeline on top of the result. Use `/annotation` when you need raw VEP fields; use `/annotation/summary` when you want pre-resolved, MAF-compatible fields.
+
+---
+
+### What does the `fields` parameter do?
 
 `fields` is a comma-separated list of enrichment sources to activate for a request. By default only the raw VEP annotation is returned. Each named field triggers an additional data fetch and merges its result into the response.
 
@@ -126,7 +143,7 @@ All valid values (case-insensitive):
 
 Example: `GET /annotation/7:g.140453136A>T?fields=annotation_summary,my_variant_info,hotspots`
 
-### OncoKB token
+#### OncoKB token
 
 OncoKB requires authentication. Pass your token via the `token` query parameter as a JSON map:
 
@@ -138,7 +155,39 @@ Without a valid token the OncoKB enricher will be called but the API request to 
 
 ---
 
-## How does Genome Nexus pick a transcript for a variant?
+## Transcript selection
+
+### What is the default `isoformOverrideSource`?
+
+**`mskcc`.** Every endpoint that accepts an `isoformOverrideSource` query parameter falls back to
+`mskcc` when the parameter is omitted, blank, or set to a value this build does not recognise.
+
+| `isoformOverrideSource` | Column used from `ensembl.canonical_transcript_per_hgnc` |
+|---|---|
+| omitted / blank / unrecognised | `mskcc_canonical_transcript` |
+| `mskcc` | `mskcc_canonical_transcript` |
+| `uniprot` | `uniprot_canonical_transcript` |
+| `ensembl` | `ensembl_canonical_transcript` |
+| `genome_nexus` | `genome_nexus_canonical_transcript` |
+
+Matching is case insensitive and surrounding whitespace is ignored, so `MSKCC` and ` mskcc ` both
+work.
+
+This applies to the annotation endpoints (`/annotation/**`, where the override set feeds
+[Step 4](#step-4--isoform-override) of transcript selection) **and** to the direct lookups
+`/ensembl/canonical-transcript/hgnc/{hugoSymbol}` and `/ensembl/canonical-transcript/hgnc` (POST).
+
+> **Note for developers:** the fallback lives in exactly one place,
+> [`IsoformOverrideSource.getOrDefault()`](https://github.com/genome-nexus/genome-nexus/blob/master/model/src/main/java/org/cbioportal/genome_nexus/util/IsoformOverrideSource.java).
+> Both `IsoformAnnotationEnricher` and `EnsemblCanonical.getCanonicalTranscriptId()` route through
+> it; do not re-implement the default per call site. Before this was centralised, omitting the
+> parameter on `/ensembl/canonical-transcript/hgnc/{hugoSymbol}` silently returned the **uniprot**
+> transcript while the annotation endpoints used mskcc, so the two disagreed for any gene where
+> the two columns differ (CDKN2A being the obvious one).
+
+---
+
+### How does Genome Nexus pick a transcript for a variant?
 
 When a variant overlaps multiple transcripts, Genome Nexus selects one "canonical" transcript through a multi-step pipeline. VEP's own canonical flag is **reset** before the pipeline runs — it is not used as input.
 
@@ -151,7 +200,7 @@ Each step can only shrink the candidate list (or leave it unchanged when the fil
 - [Step 2 — OncoKB gene preference](#step-2--oncokb-gene-preference)
 - [Step 3 — Per-transcript biotype filter](#step-3--per-transcript-biotype-filter)
 - [Step 4 — Isoform override](#step-4--isoform-override)
-- [Step 5 — Mark canonical and resolve](#step-5--mark-canonical-and-resolve)
+- [Step 5 — Highest consequence term](#step-5--highest-consequence-term)
   - [How the prioritizer picks one transcript](#how-the-prioritizer-picks-one-transcript)
     - [Pass A — Match most_severe_consequence](#pass-a--match-most_severe_consequence)
     - [Pass B — Highest-priority consequence term](#pass-b--highest-priority-consequence-term)
@@ -160,7 +209,7 @@ Each step can only shrink the candidate list (or leave it unchanged when the fil
 
 ---
 
-### Overview
+#### Overview
 
 ```
 VEP transcript_consequences
@@ -186,7 +235,7 @@ transcriptConsequenceSummary
 ![Flowchart of transcript picking](https://github.com/user-attachments/assets/1b554461-19bf-4f11-b4b4-70081a8234c3)
 ---
 
-### Step 1 — Gene-level biotype filter
+#### Step 1 — Gene-level biotype filter
 
 Group all transcripts by gene. For each gene, find the best (lowest-number) biotype among its transcripts. Then compare across genes and keep only transcripts from genes whose best biotype equals the global minimum.
 
@@ -209,7 +258,7 @@ This ensures a gene with a `protein_coding` transcript always beats a gene with 
 
 ---
 
-### Step 2 — OncoKB gene preference
+#### Step 2 — OncoKB gene preference
 
 Among surviving genes, check whether any gene symbol appears in the OncoKB cancer gene database. The filter runs in two tiers:
 
@@ -225,19 +274,19 @@ This two-tier structure prevents non-curated panel genes from outranking OncoKB-
 
 ---
 
-### Step 3 — Per-transcript biotype filter
+#### Step 3 — Per-transcript biotype filter
 
 Within the surviving genes from Step 2, apply the same biotype priority table again, but now at the **individual transcript** level. Keep only transcripts whose biotype has the lowest (best) priority value. For example, if one transcript is `protein_coding` (1) and another is `nonsense_mediated_decay` (7), only the `protein_coding` transcript survives.
 
 ---
 
-### Step 4 — Isoform override
+#### Step 4 — Isoform override
 
 Check the configured isoform override set (controlled by the `isoformOverrideSource` query parameter; default `mskcc`). Among the remaining transcripts, keep only those whose transcript ID appears in the override set. If **no** transcript matches the override set (e.g., the curated transcript is too far from the variant to appear in VEP's output), all Step 3 candidates are kept unchanged.
 
 ---
 
-### Step 5 — Highest consequence term
+#### Step 5 — Highest consequence term
 
 For all transcripts that survived Steps 1–4,
 | Scenario | Action |
@@ -246,11 +295,11 @@ For all transcripts that survived Steps 1–4,
 | **Multiple** transcripts marked canonical | Run the **prioritizer** (described below) on just the survived transcripts. |
 | **0** transcripts marked canonical | Run the **prioritizer** on **all** original transcripts as a fallback. |
 
-#### How the prioritizer picks one transcript
+##### How the prioritizer picks one transcript
 
 The [`TranscriptConsequencePrioritizer`](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/TranscriptConsequencePrioritizer.java) works in two passes to narrow candidates, then uses list position as a final tiebreaker.
 
-##### Pass A — Match `most_severe_consequence`
+###### Pass A — Match `most_severe_consequence`
 
 VEP returns a top-level `most_severe_consequence` string for the whole variant (e.g., `missense_variant`). This is the single most severe consequence term across **all** transcripts, computed by VEP itself.
 
@@ -260,7 +309,7 @@ If one transcript matches, all other transcripts are discarded.
 If more than one transcript matches, those transcripts carry forward to Pass B.
 If **no** transcript matches (rare — can happen when VEP's term is not in any transcript's list), all candidates carry forward to Pass B unchanged.
 
-##### Pass B — Highest-priority consequence term
+###### Pass B — Highest-priority consequence term
 
 Among the transcripts from Pass A, the prioritizer scans every `consequence_terms` entry and looks up its numeric priority in the `EFFECT_PRIORITY` map. It finds the **single lowest value** (= most severe) across all terms of all candidates.
 
@@ -290,7 +339,7 @@ Then it keeps only transcripts that have at least one term at that best priority
 
 (The full map contains ~60 terms. See `EFFECT_PRIORITY` in the [source code](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/TranscriptConsequencePrioritizer.java) for the complete list.)
 
-##### Final tiebreaker — VEP list order
+###### Final tiebreaker — VEP list order
 
 If multiple transcripts still tie after both passes, the prioritizer returns `bestCandidates.get(0)` — the **first** one in the list. Because the candidate list preserves VEP's original `transcript_consequences` array order throughout the pipeline, VEP's ordering is the ultimate tiebreaker.
 
@@ -298,7 +347,7 @@ As a last-resort fallback (if no transcript had any recognized consequence term 
 
 ---
 
-### Source code references
+#### Source code references
 
 | Component | Class | Role |
 |---|---|---|
@@ -309,29 +358,67 @@ As a last-resort fallback (if no transcript had any recognized consequence term 
 
 ---
 
-## What is `most_severe_consequence`, and how does it differ from `variantClassification`?
+## Protein domains
 
-`most_severe_consequence` is a field returned directly by VEP. It is the single highest-priority consequence term across **all transcripts** for the variant (e.g. `missense_variant`, `stop_gained`). VEP computes it using its own consequence severity ranking.
+### Where do protein domains come from?
 
-`variantClassification` is computed by Genome Nexus. It takes the highest-priority consequence term for the **canonical transcript only**, maps it to a MAF-style label (e.g. `Missense_Mutation`, `Nonsense_Mutation`), and optionally overrides it with a reVUE curation. See [How is `variantClassification` resolved?](#how-is-variantclassification-resolved) for the full logic.
+Pfam domains are served from the `ensembl.biomart_transcripts` collection, in each transcript's
+nested `domains` array. They originate in Ensembl's `protein_feature` table, restricted to
+`analysis.logic_name = 'pfam'`, and are retrieved by the importer's
+[`retrieve_biomart_tables.py`](https://github.com/genome-nexus/genome-nexus-importer/blob/master/scripts/retrieve_biomart_tables.py).
 
-The two fields can disagree when the most severe consequence in any transcript differs from the consequence in the canonical transcript.
+**The coordinates are protein residue offsets, not genomic positions.** `pfam_domain_start` /
+`pfam_domain_end` are amino-acid offsets within that transcript's own translation. They are
+therefore *not* affected by genome build, and no liftover is involved in moving them between
+GRCh37 and GRCh38 — as long as the protein sequence itself is unchanged.
+
+#### Pfam coverage is not stable across Ensembl releases
+
+A Pfam family can stop matching a protein when Pfam rebuilds its HMMs, so a transcript can have
+domains in one release and none in a later one. GRCh37 is frozen at Ensembl release 75, so it
+preserves a circa-2014 Pfam release; between 7,000 and 8,000 transcripts have domains in GRCh37
+that current GRCh38 does not. This is upstream data, not a retrieval bug.
 
 ---
 
-## What is reVUE, and how does it affect annotations?
+### Why does CDKN2A p16INK4A have a curated protein domain?
 
-reVUE (Revised Variant Understander and Evaluator) is a dataset of manually curated variant reclassifications, maintained at [github.com/knowledgesystems/reVUE-data](https://github.com/knowledgesystems/reVUE-data). It captures cases where VEP's predicted consequence is incorrect — most commonly for splice variants whose true functional impact differs from the sequence-based prediction.
+`ENST00000304494` (CDKN2A p16INK4A) is the one case where the importer reinstates domains that
+Ensembl does not currently report:
 
-At startup, Genome Nexus downloads the reVUE and replaces the VEP-derived `variantClassification`.
+| | |
+|---|---|
+| Backfilled domains | `PF00023` (Ank) 18–42, `PF12796` (Ank_2) 52–133 |
+| Ensembl GRCh38 | no `pfam` protein feature for this translation in releases **105–116** |
+| Pfam / InterPro | no Pfam entry at all for UniProt **P42771** (InterPro API returns HTTP 204) |
+| Still evidenced by | CATH-Gene3D `G3DSA:1.25.40.20` (1–134), SUPERFAMILY `SSF48403` (21–136), PANTHER `PTHR24201` (12–152), InterPro `IPR036770`, plus five cross-referenced PDB structures |
+| Why the coordinates are valid | the p16 protein is byte-identical between GRCh37 and GRCh38 (156 aa), verified residue by residue over both intervals |
 
-Whether unconfirmed reVUE entries are applied is controlled by `overwrite_by_confirmed_revue_only` in `application.properties`:
-- `true` — only entries with `confirmed: true` in the dataset can override VEP.
-- `false` — all reVUE entries override VEP regardless of confirmation status.
+So the ankyrin repeats really are present — three other member databases detect them, and GRCh38's
+own SUPERFAMILY/Gene3D intervals bracket the reinstated Pfam ones almost exactly. Only Pfam's HMM
+gathering threshold disagrees. p14ARF (`ENST00000579755`) is unaffected and keeps its native
+`PF07392` 4–54.
+
+This matters more than it looks because CDKN2A's default transcript is **p14ARF**, so p16 is
+reached deliberately — via `?isoformOverrideSource=mskcc` on an explicit p16 alias such as
+`CDKN2Ap16` or `p16INK4A` — and anyone looking at it specifically is exactly the person who
+expects the domain to be drawn.
+
+> **Note for developers:** overrides live in
+> [`common_input/pfam_domain_overrides.txt`](https://github.com/genome-nexus/genome-nexus-importer/blob/master/data/common_input/pfam_domain_overrides.txt)
+> and are applied by `apply_pfam_domain_overrides()` in
+> [`add_domains_hugo_ccds_refseq_exon_info_uniprot_to_ensembl_transcript.py`](https://github.com/genome-nexus/genome-nexus-importer/blob/master/scripts/add_domains_hugo_ccds_refseq_exon_info_uniprot_to_ensembl_transcript.py).
+> It is a **backfill**: a transcript that already has any Pfam domain in the build is left
+> untouched, so an override can never mask live Ensembl data and silently becomes a no-op if
+> Ensembl restores the annotation. Before adding a row, confirm the protein sequence is unchanged
+> between the source and target builds — if it is not, the residue intervals must be re-derived by
+> alignment rather than copied.
 
 ---
 
-## What is the difference between `hgvsp` and `HGVSp_Short`?
+## Protein change and HGVS
+
+### What is the difference between `hgvsp` and `HGVSp_Short`?
 
 `hgvsp` is the raw protein notation returned by VEP. It uses three-letter amino acid codes and includes the protein/transcript ID prefix, for example: `ENSP00000288602.6:p.Val600Glu`.
 
@@ -341,31 +428,94 @@ See [How is `HGVSp_Short` resolved?](#how-is-hgvsp_short-resolved) for the full 
 
 ---
 
-## Why can the same variant return different annotations on different Genome Nexus instances?
+### How is `HGVSp_Short` resolved?
 
-Several deployment-level factors affect the annotation:
+`HGVSp_Short` is computed by a three-tier fallback chain. Each tier is tried in order; the first one that produces a non-null value wins.
 
-- **VEP version** — newer VEP versions introduce additional consequence terms (e.g. `splice_donor_5th_base_variant` added in VEP 105), which change `variantClassification` and `HGVSp_Short` for splice-region variants.
-- **Genome build** — GRCh37 and GRCh38 instances use different VEP endpoints and reference sequences. Coordinates and transcripts differ.
-- **reVUE configuration** — `overwrite_by_confirmed_revue_only=true` vs `false` controls whether unconfirmed curations override VEP.
-- **Canonical transcript configuration** — `prioritize_cancer_gene_transcripts=true` can select a different transcript than an instance where it is disabled.
-- **Cache state** — a cached annotation from an older VEP version will differ from a fresh annotation if VEP was upgraded without clearing the MongoDB cache.
+#### Tier 1 — Convert VEP's raw `hgvsp`
+
+VEP returns a full protein notation such as `ENSP00000288602.6:p.Val600Glu`. Genome Nexus processes it in two steps:
+
+1. **Normalize** — strip the transcript/protein ID prefix (everything up to and including the first `:`), and translate the URL-encoded synonymous marker `(p.%3D)` to `p.=`.
+2. **3-to-1 amino acid conversion** — replace every three-letter amino acid code with its single-letter equivalent using this table:
+
+| 3-letter | 1-letter | 3-letter | 1-letter |
+|---|---|---|---|
+| `Ala` | `A` | `Met` | `M` |
+| `Arg` | `R` | `Phe` | `F` |
+| `Asn` | `N` | `Pro` | `P` |
+| `Asp` | `D` | `Ser` | `S` |
+| `Asx` | `B` | `Thr` | `T` |
+| `Cys` | `C` | `Trp` | `W` |
+| `Gln` | `Q` | `Tyr` | `Y` |
+| `Glu` | `E` | `Val` | `V` |
+| `Glx` | `Z` | `Xxx` | `X` |
+| `Gly` | `G` | `Ter` | `*` |
+| `His` | `H` | | |
+| `Ile` | `I` | | |
+| `Leu` | `L` | | |
+| `Lys` | `K` | | |
+
+**Example:** `ENSP00000288602.6:p.Val600Glu` → `p.V600E`
+
+#### Tier 2 — Synthesize from HGVSc
+
+When `hgvsp` is unavailable, Genome Nexus derives a protein notation from the cDNA HGVSc string.
+
+**Compute the protein position from the cDNA position:**
+
+```
+cDNA_position    =  first integer captured by regex .*[cn].-?\*?(\d+).* from the HGVSc string
+protein_position =  (cDNA_position + 2) / 3   (integer division, minimum 1)
+```
+
+The regex captures only the exon-anchored base number; any intronic offset (`+5`, `-3`) and UTR marker (`*`) that follows are discarded.
+
+**Special case — UTR-start range:** If the HGVSc starts with a negative (5′ UTR) coordinate followed by a range, e.g. `c.-309_60+142del`, the regex would capture `309` and lose the minus sign. In this case the **second** position in the range (`60`) is used instead, as it is the CDS-anchored splice-relevant coordinate. Example: `c.-309_60+142del` → cPos = 60 → pPos = (60+2)/3 = **20** → `p.X20_splice`.
+
+**Branch on the consequence term:**
+
+| Condition | Output |
+|---|---|
+| HGVSc contains `c.*` (3′ UTR position) | `null` — no protein position exists |
+| First consequence term is `splice_acceptor_variant` or `splice_donor_variant` | `p.X{pos}_splice` |
+| `amino_acids` is null **and** variant classification contains `"frame_shift"` | `p.*{pos}fs*` |
+| `amino_acids` is null **and** no frameshift | `p.*{pos}*` |
+
+**Examples:**
+- `c.50-1_50delinsTT` (splice acceptor, cDNA pos 50, pPos 17) → `p.X17_splice`
+- `c.-309_60+142del` (splice donor spanning UTR→CDS, CDS pos 60, pPos 20) → `p.X20_splice`
+- `c.340insG` (frameshift, cDNA pos 340, pPos 114) → `p.*114fs*`
+- `c.4349A>G` (stop gained, cDNA pos 4349, pPos 1450) → `p.*1450*`
+
+#### Tier 3 — Salvage from the `amino_acids` field
+
+When both tiers above produce null, Genome Nexus falls back to building a notation from VEP's `amino_acids` field (format: `Ref/Alt`) combined with `protein_start` and `protein_end`.
+
+| Variant type (from `consequence_terms`) | Condition | Output |
+|---|---|---|
+| `inframe_insertion` | HGVSc contains `dup`, single AA inserted | `p.{altAA}{proteinStart - 1}dup` |
+| `inframe_insertion` | HGVSc contains `dup`, multiple AAs inserted | `p.{altAA[0]}{proteinStart + 1}_{altAA[last]}{proteinStart + len}dup` |
+| `inframe_insertion` | Regular insertion | `p.X{proteinStart}_X{proteinEnd}ins{altAA}` |
+| `inframe_deletion` | — | `p.{refAA}{proteinStart}del` |
+| `frameshift_variant` | — | `p.{refAA}{proteinStart}fs` |
+| Other (missense, etc.) | — | `p.{refAA}{proteinStart}{altAA}` |
+
+**Examples:**
+- `amino_acids=EA/A`, `inframe_deletion`, pos 1350 → `p.E1350del`
+- `amino_acids=L/Vfs`, `frameshift_variant`, pos 431 → `p.L431fs`
+- `amino_acids=K/E`, missense, pos 373 → `p.K373E`
+
+> **Note for developers:** The three-tier chain is in [`resolveHgvspShort(VariantAnnotation, TranscriptConsequence)` (lines 67–91)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L67) in `ProteinChangeResolver.java`. Key subordinate methods:
+> - **Tier 1 normalization & conversion:** [`normalizeHgvsp()` (lines 348–362)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L348) and [`resolveHgvspShortFromHgvsp()` (lines 95–109)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L95)
+> - **Splice suppression:** [`resolveHgvsp()` (lines 244–260)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L244)
+> - **Tier 2 (HGVSc synthesis):** [`resolveHgvspShortFromHgvsc()` (lines 113–156)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L113); cDNA regex at [line 41](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L41)
+> - **Tier 3 (AA salvage):** [`resolveHgvspShortFromAAs()` (lines 159–227)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L159)
+> - **Splice site constant:** [`SPLICE_SITE_VARIANTS` (lines 27–29)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L27)
 
 ---
 
-## How do I force a re-annotation of a cached variant?
-
-Two options:
-
-1. **Disable caching globally** — set `cache.enabled=false` in `application.properties` and restart. All requests will bypass the cache and call VEP directly. Re-enable afterward to resume caching.
-
-2. **Delete the cached document** — connect to the MongoDB instance and delete the document from the `vep.annotation` collection where the `_id` field matches the variant string. The next request for that variant will call VEP fresh and cache the new result.
-
-There is no per-request cache-bypass parameter in the API.
-
----
-
-## When is `HGVSp_Short` empty?
+### When is `HGVSp_Short` empty?
 
 `HGVSp_Short` is intentionally left empty in these cases:
 
@@ -377,7 +527,7 @@ There is no per-request cache-bypass parameter in the API.
 
 ---
 
-## Why is a splice variant labeled `X(pos)_splice` vs `p.*(pos)*`?
+### Why is a splice variant labeled `X(pos)_splice` vs `p.*(pos)*`?
 
 The label depends on which consequence term VEP assigns as the **most severe** (first) consequence for the canonical transcript. The exact definitions come from the [Ensembl VEP consequence type table](https://www.ensembl.org/info/genome/variation/prediction/predicted_data.html?redirect=no#consequence_type_table):
 
@@ -429,7 +579,7 @@ Genome Nexus does not apply its own distance cutoff — it relies entirely on wh
 
 ---
 
-## How is the protein position in `X(pos)_splice` and `p.*(pos)*` calculated?
+### How is the protein position in `X(pos)_splice` and `p.*(pos)*` calculated?
 
 The position is derived from the cDNA position in HGVSc, not from a protein-level annotation. The formula is:
 
@@ -441,7 +591,7 @@ For example, `c.3709-5C>A` → cDNA position 3709 → protein position (3709 + 2
 
 The intronic offset (the `-5` part) is stripped before this calculation; only the exon-anchored cDNA number is used.
 
-### Special case: UTR-start range deletions
+#### Special case: UTR-start range deletions
 
 When HGVSc spans a range that starts in the 5′ UTR and ends in the coding sequence — for example `c.-309_60+142del` — the normal regex captures the first number (`309`) and silently drops the minus sign, which would produce the wrong position. To handle this, when the HGVSc matches the pattern `c.-N_M` (UTR start followed by a range), the **second** position (`M`) is used instead, since it represents the last coding nucleotide before the splice junction.
 
@@ -453,144 +603,23 @@ For `c.-309_60+142del`: second position = `60` → protein position = (60 + 2) /
 
 ---
 
-## When is `successfully_annotated` false?
+## Consequence and variant classification
 
-`successfully_annotated: false` means Genome Nexus could not obtain a valid annotation from VEP for that variant. The most common causes:
+### What is `most_severe_consequence`, and how does it differ from `variantClassification`?
 
-- **VEP is down or unreachable** — any HTTP 5xx or connection error results in a placeholder annotation with this flag set to false.
-- **VEP returns a 4xx error** — for example, a malformed variant string that VEP rejects.
-- **Any unexpected exception** during annotation processing.
+`most_severe_consequence` is a field returned directly by VEP. It is the single highest-priority consequence term across **all transcripts** for the variant (e.g. `missense_variant`, `stop_gained`). VEP computes it using its own consequence severity ranking.
 
-When `successfully_annotated: true`, it means VEP responded with HTTP 200 and the result was transformed without error, but `transcript_consequences` could be null.
+`variantClassification` is computed by Genome Nexus. It takes the highest-priority consequence term for the **canonical transcript only**, maps it to a MAF-style label (e.g. `Missense_Mutation`, `Nonsense_Mutation`), and optionally overrides it with a reVUE curation. See [How is `variantClassification` resolved?](#how-is-variantclassification-resolved) for the full logic.
 
-> **Note for developers:** The flag is set by `setSuccessfullyAnnotated(true)` only on the path where `super.fetchAndCache(id)` returns a non-null `VariantAnnotation`. All exception paths (`HttpServerErrorException`, `HttpClientErrorException`, and the generic `catch (Exception e)`) create an empty `VariantAnnotation` without calling that setter, leaving the field false. There is no retry logic anywhere in the codebase — on VEP failure, the error is logged at ERROR level under `org.cbioportal.genome_nexus.service.cached.BaseCachedExternalResourceFetcher` and the placeholder is returned immediately.
+The two fields can disagree when the most severe consequence in any transcript differs from the consequence in the canonical transcript.
 
 ---
 
-## When is `transcript_consequences` null or empty?
-
-| Scenario | Value |
-|---|---|
-| VEP is down / unreachable | `null` |
-| Truly intergenic variant (no nearby gene) | `null` — VEP omits the field and returns `intergenic_consequences` instead |
-| Variant outside all transcript boundaries | `null` |
-| Variant in unannotated / gap regions | `null` |
-| VEP returns valid consequences | populated list |
-
-Note that variants with `upstream_gene_variant` or `downstream_gene_variant` consequences **do** appear in `transcript_consequences` — only variants with no gene context at all produce null.
-
-In practice, VEP omits the field entirely rather than returning an empty array, so `[]` is not a realistic value. The field will be either `null` or a populated list.
-
-> **Note for developers:** The field is populated entirely by Jackson deserialization of VEP's JSON — application code never sets it explicitly. VEP omitting the field maps to `null`; VEP returning `"transcript_consequences": []` would map to `[]`, but this does not occur in practice.
-
----
-
-## When is `annotation_summary.transcriptConsequenceSummaries` empty?
-
-`transcriptConsequenceSummaries` is `[]` whenever `transcript_consequences` from VEP is null — this covers both the VEP-down case and intergenic variants. It is never null; the field is always initialized to an empty list before population is attempted.
-
-It is only populated when both conditions are met:
-1. VEP successfully returned `transcript_consequences` (non-null), **and**
-2. The summary endpoint is called (`/annotation` with `fields=annotation_summary`, or `/annotation/summary/{variant}`).
-
-Each entry is an enriched view of a VEP transcript consequence with resolved fields: protein position, codon change, amino acids, Hugo gene symbol, variant classification, RefSeq transcript IDs, and more.
-
-> **Note for developers:** The guard is an `if (transcriptConsequences != null)` check in `VariantAnnotationSummaryServiceImpl`. When it is skipped, an empty `ArrayList` is set on the summary object. This field is not a fallback source — it is derived directly from VEP data and carries no information that VEP did not provide.
-
----
-
-## How is `HGVSp_Short` resolved?
-
-`HGVSp_Short` is computed by a three-tier fallback chain. Each tier is tried in order; the first one that produces a non-null value wins.
-
-### Tier 1 — Convert VEP's raw `hgvsp`
-
-VEP returns a full protein notation such as `ENSP00000288602.6:p.Val600Glu`. Genome Nexus processes it in two steps:
-
-1. **Normalize** — strip the transcript/protein ID prefix (everything up to and including the first `:`), and translate the URL-encoded synonymous marker `(p.%3D)` to `p.=`.
-2. **3-to-1 amino acid conversion** — replace every three-letter amino acid code with its single-letter equivalent using this table:
-
-| 3-letter | 1-letter | 3-letter | 1-letter |
-|---|---|---|---|
-| `Ala` | `A` | `Met` | `M` |
-| `Arg` | `R` | `Phe` | `F` |
-| `Asn` | `N` | `Pro` | `P` |
-| `Asp` | `D` | `Ser` | `S` |
-| `Asx` | `B` | `Thr` | `T` |
-| `Cys` | `C` | `Trp` | `W` |
-| `Gln` | `Q` | `Tyr` | `Y` |
-| `Glu` | `E` | `Val` | `V` |
-| `Glx` | `Z` | `Xxx` | `X` |
-| `Gly` | `G` | `Ter` | `*` |
-| `His` | `H` | | |
-| `Ile` | `I` | | |
-| `Leu` | `L` | | |
-| `Lys` | `K` | | |
-
-**Example:** `ENSP00000288602.6:p.Val600Glu` → `p.V600E`
-
-### Tier 2 — Synthesize from HGVSc
-
-When `hgvsp` is unavailable, Genome Nexus derives a protein notation from the cDNA HGVSc string.
-
-**Compute the protein position from the cDNA position:**
-
-```
-cDNA_position    =  first integer captured by regex .*[cn].-?\*?(\d+).* from the HGVSc string
-protein_position =  (cDNA_position + 2) / 3   (integer division, minimum 1)
-```
-
-The regex captures only the exon-anchored base number; any intronic offset (`+5`, `-3`) and UTR marker (`*`) that follows are discarded.
-
-**Special case — UTR-start range:** If the HGVSc starts with a negative (5′ UTR) coordinate followed by a range, e.g. `c.-309_60+142del`, the regex would capture `309` and lose the minus sign. In this case the **second** position in the range (`60`) is used instead, as it is the CDS-anchored splice-relevant coordinate. Example: `c.-309_60+142del` → cPos = 60 → pPos = (60+2)/3 = **20** → `p.X20_splice`.
-
-**Branch on the consequence term:**
-
-| Condition | Output |
-|---|---|
-| HGVSc contains `c.*` (3′ UTR position) | `null` — no protein position exists |
-| First consequence term is `splice_acceptor_variant` or `splice_donor_variant` | `p.X{pos}_splice` |
-| `amino_acids` is null **and** variant classification contains `"frame_shift"` | `p.*{pos}fs*` |
-| `amino_acids` is null **and** no frameshift | `p.*{pos}*` |
-
-**Examples:**
-- `c.50-1_50delinsTT` (splice acceptor, cDNA pos 50, pPos 17) → `p.X17_splice`
-- `c.-309_60+142del` (splice donor spanning UTR→CDS, CDS pos 60, pPos 20) → `p.X20_splice`
-- `c.340insG` (frameshift, cDNA pos 340, pPos 114) → `p.*114fs*`
-- `c.4349A>G` (stop gained, cDNA pos 4349, pPos 1450) → `p.*1450*`
-
-### Tier 3 — Salvage from the `amino_acids` field
-
-When both tiers above produce null, Genome Nexus falls back to building a notation from VEP's `amino_acids` field (format: `Ref/Alt`) combined with `protein_start` and `protein_end`.
-
-| Variant type (from `consequence_terms`) | Condition | Output |
-|---|---|---|
-| `inframe_insertion` | HGVSc contains `dup`, single AA inserted | `p.{altAA}{proteinStart - 1}dup` |
-| `inframe_insertion` | HGVSc contains `dup`, multiple AAs inserted | `p.{altAA[0]}{proteinStart + 1}_{altAA[last]}{proteinStart + len}dup` |
-| `inframe_insertion` | Regular insertion | `p.X{proteinStart}_X{proteinEnd}ins{altAA}` |
-| `inframe_deletion` | — | `p.{refAA}{proteinStart}del` |
-| `frameshift_variant` | — | `p.{refAA}{proteinStart}fs` |
-| Other (missense, etc.) | — | `p.{refAA}{proteinStart}{altAA}` |
-
-**Examples:**
-- `amino_acids=EA/A`, `inframe_deletion`, pos 1350 → `p.E1350del`
-- `amino_acids=L/Vfs`, `frameshift_variant`, pos 431 → `p.L431fs`
-- `amino_acids=K/E`, missense, pos 373 → `p.K373E`
-
-> **Note for developers:** The three-tier chain is in [`resolveHgvspShort(VariantAnnotation, TranscriptConsequence)` (lines 67–91)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L67) in `ProteinChangeResolver.java`. Key subordinate methods:
-> - **Tier 1 normalization & conversion:** [`normalizeHgvsp()` (lines 348–362)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L348) and [`resolveHgvspShortFromHgvsp()` (lines 95–109)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L95)
-> - **Splice suppression:** [`resolveHgvsp()` (lines 244–260)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L244)
-> - **Tier 2 (HGVSc synthesis):** [`resolveHgvspShortFromHgvsc()` (lines 113–156)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L113); cDNA regex at [line 41](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L41)
-> - **Tier 3 (AA salvage):** [`resolveHgvspShortFromAAs()` (lines 159–227)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L159)
-> - **Splice site constant:** [`SPLICE_SITE_VARIANTS` (lines 27–29)](https://github.com/genome-nexus/genome-nexus/blob/master/component/src/main/java/org/cbioportal/genome_nexus/component/annotation/ProteinChangeResolver.java#L27)
-
----
-
-## How is `variantClassification` resolved?
+### How is `variantClassification` resolved?
 
 `variantClassification` is computed in three stages: consequence selection, variant type detection, and consequence-to-classification mapping. An optional fourth stage lets manually curated data override the result.
 
-### Stage 1 — Select the consequence term
+#### Stage 1 — Select the consequence term
 
 VEP returns a list of consequence terms for each transcript (e.g. `["missense_variant", "splice_region_variant"]`). Genome Nexus picks the **highest-priority** term using a ranked list defined in `TranscriptConsequencePrioritizer`. Lower rank number = higher severity:
 
@@ -614,7 +643,7 @@ The consequence source depends on what VEP returned:
 - Else if the annotation has `intergenic_consequences` (no transcript context) → use those terms.
 - Else fall back to `most_severe_consequence` from the top-level VEP annotation.
 
-### Stage 2 — Determine variant type and in-frame status
+#### Stage 2 — Determine variant type and in-frame status
 
 The variant type is derived by comparing the lengths of the reference and alternate alleles:
 
@@ -635,7 +664,7 @@ in_frame = |ref.length − alt.length| % 3 == 0
 
 A difference that is a multiple of 3 keeps the reading frame intact (`In_Frame_Ins` / `In_Frame_Del`); any other difference causes a frameshift (`Frame_Shift_Ins` / `Frame_Shift_Del`).
 
-### Stage 3 — Map consequence term → variantClassification
+#### Stage 3 — Map consequence term → variantClassification
 
 The selected consequence term is mapped to a MAF style classification. Context dependent entries (marked with *) also require the variant type and in-frame result from Stage 2:
 
@@ -691,7 +720,69 @@ The selected consequence term is mapped to a MAF style classification. Context d
 
 ---
 
-## What gets cached to MongoDB, and what does not?
+### What is reVUE, and how does it affect annotations?
+
+reVUE (Revised Variant Understander and Evaluator) is a dataset of manually curated variant reclassifications, maintained at [github.com/knowledgesystems/reVUE-data](https://github.com/knowledgesystems/reVUE-data). It captures cases where VEP's predicted consequence is incorrect — most commonly for splice variants whose true functional impact differs from the sequence-based prediction.
+
+At startup, Genome Nexus downloads the reVUE and replaces the VEP-derived `variantClassification`.
+
+Whether unconfirmed reVUE entries are applied is controlled by `overwrite_by_confirmed_revue_only` in `application.properties`:
+- `true` — only entries with `confirmed: true` in the dataset can override VEP.
+- `false` — all reVUE entries override VEP regardless of confirmation status.
+
+---
+
+## Empty or missing results
+
+### When is `successfully_annotated` false?
+
+`successfully_annotated: false` means Genome Nexus could not obtain a valid annotation from VEP for that variant. The most common causes:
+
+- **VEP is down or unreachable** — any HTTP 5xx or connection error results in a placeholder annotation with this flag set to false.
+- **VEP returns a 4xx error** — for example, a malformed variant string that VEP rejects.
+- **Any unexpected exception** during annotation processing.
+
+When `successfully_annotated: true`, it means VEP responded with HTTP 200 and the result was transformed without error, but `transcript_consequences` could be null.
+
+> **Note for developers:** The flag is set by `setSuccessfullyAnnotated(true)` only on the path where `super.fetchAndCache(id)` returns a non-null `VariantAnnotation`. All exception paths (`HttpServerErrorException`, `HttpClientErrorException`, and the generic `catch (Exception e)`) create an empty `VariantAnnotation` without calling that setter, leaving the field false. There is no retry logic anywhere in the codebase — on VEP failure, the error is logged at ERROR level under `org.cbioportal.genome_nexus.service.cached.BaseCachedExternalResourceFetcher` and the placeholder is returned immediately.
+
+---
+
+### When is `transcript_consequences` null or empty?
+
+| Scenario | Value |
+|---|---|
+| VEP is down / unreachable | `null` |
+| Truly intergenic variant (no nearby gene) | `null` — VEP omits the field and returns `intergenic_consequences` instead |
+| Variant outside all transcript boundaries | `null` |
+| Variant in unannotated / gap regions | `null` |
+| VEP returns valid consequences | populated list |
+
+Note that variants with `upstream_gene_variant` or `downstream_gene_variant` consequences **do** appear in `transcript_consequences` — only variants with no gene context at all produce null.
+
+In practice, VEP omits the field entirely rather than returning an empty array, so `[]` is not a realistic value. The field will be either `null` or a populated list.
+
+> **Note for developers:** The field is populated entirely by Jackson deserialization of VEP's JSON — application code never sets it explicitly. VEP omitting the field maps to `null`; VEP returning `"transcript_consequences": []` would map to `[]`, but this does not occur in practice.
+
+---
+
+### When is `annotation_summary.transcriptConsequenceSummaries` empty?
+
+`transcriptConsequenceSummaries` is `[]` whenever `transcript_consequences` from VEP is null — this covers both the VEP-down case and intergenic variants. It is never null; the field is always initialized to an empty list before population is attempted.
+
+It is only populated when both conditions are met:
+1. VEP successfully returned `transcript_consequences` (non-null), **and**
+2. The summary endpoint is called (`/annotation` with `fields=annotation_summary`, or `/annotation/summary/{variant}`).
+
+Each entry is an enriched view of a VEP transcript consequence with resolved fields: protein position, codon change, amino acids, Hugo gene symbol, variant classification, RefSeq transcript IDs, and more.
+
+> **Note for developers:** The guard is an `if (transcriptConsequences != null)` check in `VariantAnnotationSummaryServiceImpl`. When it is skipped, an empty `ArrayList` is set on the summary object. This field is not a fallback source — it is derived directly from VEP data and carries no information that VEP did not provide.
+
+---
+
+## Caching and instance differences
+
+### What gets cached to MongoDB, and what does not?
 
 In `application.properties`, you can configure caching by setting `cache.enabled=`.
 - `cache.enabled=true`: Enables or disables caching for annotation sources such as vep.annotation, index, my_variant_info.annotation. Default value is true.
@@ -706,3 +797,29 @@ Failed VEP calls are never cached. Successful HTTP 200 responses from VEP are ca
 | VEP returns 4xx | **No** |
 
 A practical consequence: if a variant is intergenic, the empty annotation is cached on first lookup. All subsequent requests will serve that cached result without re-querying VEP. To force a re-fetch, delete the document from the `vep.annotation` MongoDB collection or temporarily set `cache.enabled=false`.
+
+---
+
+### How do I force a re-annotation of a cached variant?
+
+Two options:
+
+1. **Disable caching globally** — set `cache.enabled=false` in `application.properties` and restart. All requests will bypass the cache and call VEP directly. Re-enable afterward to resume caching.
+
+2. **Delete the cached document** — connect to the MongoDB instance and delete the document from the `vep.annotation` collection where the `_id` field matches the variant string. The next request for that variant will call VEP fresh and cache the new result.
+
+There is no per-request cache-bypass parameter in the API.
+
+---
+
+### Why can the same variant return different annotations on different Genome Nexus instances?
+
+Several deployment-level factors affect the annotation:
+
+- **VEP version** — newer VEP versions introduce additional consequence terms (e.g. `splice_donor_5th_base_variant` added in VEP 105), which change `variantClassification` and `HGVSp_Short` for splice-region variants.
+- **Genome build** — GRCh37 and GRCh38 instances use different VEP endpoints and reference sequences. Coordinates and transcripts differ.
+- **reVUE configuration** — `overwrite_by_confirmed_revue_only=true` vs `false` controls whether unconfirmed curations override VEP.
+- **Canonical transcript configuration** — `prioritize_cancer_gene_transcripts=true` can select a different transcript than an instance where it is disabled.
+- **Cache state** — a cached annotation from an older VEP version will differ from a fresh annotation if VEP was upgraded without clearing the MongoDB cache.
+
+---

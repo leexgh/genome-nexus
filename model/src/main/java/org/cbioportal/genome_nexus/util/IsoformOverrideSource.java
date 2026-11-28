@@ -6,6 +6,12 @@ public class IsoformOverrideSource {
     public static final String UNIPROT = "uniprot";
     public static final String MSKCC = "mskcc";
 
+    /**
+     * Normalises a requested isoform override source. Anything unusable -- null, blank, or a
+     * source this build does not know -- resolves to {@link #MSKCC}, which is the documented
+     * default for every endpoint that takes an isoformOverrideSource parameter. This is the
+     * single place that decision is made; do not re-implement it per call site.
+     */
     public static String getOrDefault(String isoformOverrideSource) {
         String normalizedSource = isoformOverrideSource == null ?
             MSKCC : isoformOverrideSource.trim().toLowerCase();

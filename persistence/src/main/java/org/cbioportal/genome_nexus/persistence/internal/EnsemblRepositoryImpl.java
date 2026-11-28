@@ -1,12 +1,14 @@
 package org.cbioportal.genome_nexus.persistence.internal;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.cbioportal.genome_nexus.model.EnsemblCanonical;
@@ -65,6 +67,18 @@ public class EnsemblRepositoryImpl implements EnsemblRepositoryCustom
                 query.addCriteria(synonymCriteria);
                 ensemblCanonical = mongoTemplate.findOne(query,
                     EnsemblCanonical.class, CANONICAL_TRANSCRIPTS_COLLECTION);
+
+                if (ensemblCanonical == null) {
+                    // check transcript alias symbols (e.g. CDKN2Ap14), which name one specific
+                    // reading frame of a gene rather than a gene of their own. Documents imported
+                    // before this field existed simply never match, so the lookup degrades to null.
+                    Criteria aliasCriteria = Criteria.where("canonical_transcript_alias")
+                        .regex("(^|,)\\s*" + Pattern.quote(hugoSymbol) + "\\s*:", "i");
+                    query = new Query();
+                    query.addCriteria(aliasCriteria);
+                    ensemblCanonical = mongoTemplate.findOne(query,
+                        EnsemblCanonical.class, CANONICAL_TRANSCRIPTS_COLLECTION);
+                }
             }
         }
 
@@ -109,8 +123,15 @@ public class EnsemblRepositoryImpl implements EnsemblRepositoryCustom
     public EnsemblTranscript findOneByHugoSymbolIgnoreCase(String hugoSymbol, String isoformOverrideSource) {
         EnsemblCanonical ensemblCanonical = this.findOneCanonicalByHugoSymbol(hugoSymbol);
         if (ensemblCanonical != null) {
+            // An alias symbol names one specific reading frame, so it wins over the canonical
+            // pick for every isoform override source. Null for a plain gene symbol, and null on
+            // documents without the alias field, which both fall through to the canonical pick.
+            String transcriptId = ensemblCanonical.getCanonicalTranscriptIdForAliasSymbol(hugoSymbol);
+            if (transcriptId == null) {
+                transcriptId = ensemblCanonical.getCanonicalTranscriptId(isoformOverrideSource);
+            }
             Query query = new Query();
-            query.addCriteria(Criteria.where(EnsemblTranscript.TRANSCRIPT_ID_FIELD_NAME).is(ensemblCanonical.getCanonicalTranscriptId(isoformOverrideSource)));
+            query.addCriteria(Criteria.where(EnsemblTranscript.TRANSCRIPT_ID_FIELD_NAME).is(transcriptId));
 
             EnsemblTranscript transcript = mongoTemplate.findOne(query, EnsemblTranscript.class, TRANSCRIPTS_COLLECTION);
             if (transcript != null) {
@@ -139,6 +160,18 @@ public class EnsemblRepositoryImpl implements EnsemblRepositoryCustom
 
             hugoSymbolToEntrezGeneIdMap.put(officialSymbol, entrezId);
             entrezGeneIdToHugoSymbolMap.put(entrezId, officialSymbol);
+
+            // transcript alias symbols resolve to the same gene, so they answer entrez lookups
+            // too. Deliberately one-directional: entrezGeneIdToHugoSymbolMap keeps reporting the
+            // official symbol, so an alias never becomes the name of the gene.
+            for (String aliasSymbol : transcript.getAliasSymbols()) {
+                if (aliasSymbol == null || aliasSymbol.isEmpty()) continue;
+                List<String> aliases = geneAliasToEntrezGeneIdMap
+                    .computeIfAbsent(aliasSymbol, k -> new ArrayList<>());
+                if (entrezId != null && !aliases.contains(entrezId)) {
+                    aliases.add(entrezId);
+                }
+            }
 
             // alias synonyms to entrez id
             if (synonyms != null) {
@@ -247,13 +280,15 @@ public class EnsemblRepositoryImpl implements EnsemblRepositoryCustom
             .map(t -> t.getCanonicalTranscriptId(isoformOverrideSource))
             .collect(Collectors.toSet());
 
-        // CDKN2A is a special case where it has two canonical transcripts
-        // by default the first canonical transcript ENST00000579755 is returned
-        // if the isoform override source is mskcc then the second canonical transcript ENST00000304494 should be added as well
-        // ENST00000579755 is MANE plus clinical p14, ENST00000304494 is (p16 MANE). Germline transcript is MANE plus clinical.
-
-        if ("mskcc".equalsIgnoreCase(isoformOverrideSource)) {
-            canonicalTranscriptIds.add("ENST00000304494");
+        // A gene can legitimately have more than one canonical transcript -- CDKN2A's two
+        // reading frames (ENST00000579755 p14ARF, MANE Plus Clinical, the germline transcript and
+        // the default; and ENST00000304494 p16INK4A, MANE Select) are the standing example.
+        // The importer writes the default to mskcc_canonical_transcript and the rest to
+        // mskcc_canonical_transcript_additional, so no gene needs to be named here.
+        for (EnsemblCanonical transcript : transcripts) {
+            Collections.addAll(
+                canonicalTranscriptIds,
+                transcript.getAdditionalCanonicalTranscriptIds(isoformOverrideSource));
         }
         return canonicalTranscriptIds;
     }
